@@ -1,0 +1,32 @@
+/target
+*.swp
+*.swo
+*~
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
+.DS_Store
+.idea/
+.vscode/
+*.log
+!proofs/raw/*.log
+dist/
+coverage/
+*.profraw
+*.profdata
+# Artefacts de build Debian (g\u00e9n\u00e9r\u00e9s par debuild)
+debian/.debhelper/
+debian/debhelper-build-stamp
+debian/files
+debian/*.substvars
+debian/*.debhelper.log
+../*.deb
+../*.dsc
+../*.tar.xz
+../*.buildinfo
+../*.changes
+audit.txt
+# Binaires de debug locaux
+target/debug/

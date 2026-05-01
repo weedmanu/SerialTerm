@@ -1,0 +1,42 @@
+[graph]
+targets = [
+    { triple = "x86_64-unknown-linux-gnu" },
+    { triple = "aarch64-unknown-linux-gnu" },
+]
+
+[advisories]
+db-urls = ["https://github.com/RustSec/advisory-db"]
+yanked = "deny"
+
+[licenses]
+version = 2
+confidence-threshold = 0.8
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-3-Clause",
+    "GPL-3.0-or-later",
+    "ISC",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Zlib",
+]
+
+[bans]
+multiple-versions = "deny"
+wildcards = "allow"
+
+[[bans.skip]]
+name = "toml_datetime"
+version = "=0.7.5"
+reason = "Le dernier couple system-deps 7.0.7 / toml 0.9 garde encore la ligne 0.7.x alors que les macros GTK utilisent toml_edit 0.25 et toml_datetime 1.x; aucun alignement amont plus recent n'est publie."
+
+[[bans.skip]]
+name = "winnow"
+version = "=0.7.15"
+reason = "Le dernier system-deps 7.0.7 resolve toml 0.9 avec winnow 0.7.x alors que la pile toml parser/edit moderne impose winnow 1.x; garder une exception exacte jusqu'a convergence amont."
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

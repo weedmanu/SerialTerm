@@ -1,0 +1,29 @@
+#!/bin/sh
+set -e
+
+# update icon cache and desktop database
+if [ "$1" = "configure" ]; then
+    if command -v update-desktop-database >/dev/null 2>&1; then
+        update-desktop-database -q /usr/share/applications || true
+    fi
+
+    if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+        gtk-update-icon-cache -f -t /usr/share/icons/hicolor || true
+    fi
+    
+    echo "======================================================================="
+    echo " SerialTerm a été installé avec succès."
+    echo ""
+    echo " [! INFO PORT SÉRIE !]"
+    echo " Pour accéder aux ports série (/dev/ttyUSB0, /dev/ttyACM0) sans root,"
+    echo " votre utilisateur doit appartenir au groupe 'dialout'."
+    echo ""
+    echo " Si ce n'est pas déjà fait, lancez cette commande :"
+    echo "    sudo usermod -a -G dialout \$USER"
+    echo ""
+    echo " Puis déconnectez-vous et reconnectez-vous pour appliquer les droits."
+    echo "======================================================================="
+fi
+
+#DEBHELPER#
+exit 0

@@ -1,0 +1,19 @@
+[Desktop Entry]
+Type=Application
+Name=SerialTerm
+GenericName=Serial Terminal
+GenericName[fr]=Terminal serie
+GenericName[en]=Serial Terminal
+Comment=Terminal pour connexions série
+Comment[fr]=Terminal pour connexions serie
+Comment[en]=Terminal for serial connections
+Icon=serial-term
+Exec=serial-term
+TryExec=serial-term
+Categories=System;TerminalEmulator;GTK;
+Keywords=serial;terminal;port;
+Keywords[fr]=serie;serial;terminal;port;rs232;usb;
+Keywords[en]=serial;terminal;port;rs232;usb;
+Terminal=false
+StartupNotify=true
+StartupWMClass=io.github.TutoElectroWeb.SerialTerm

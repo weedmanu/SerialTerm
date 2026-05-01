@@ -1,0 +1,228 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "master", "develop"]
+  pull_request:
+    branches: ["main", "master"]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Formatage & Lint
+  # ─────────────────────────────────────────────────────────────────────────────
+  fmt-clippy:
+    name: Gate qualité
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer les dépendances système (GTK4 + Libadwaita + Keyring)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            libdbus-1-dev \
+            libudev-dev \
+            libssl-dev \
+            pkg-config \
+            cmake \
+            clang \
+            libclang-dev
+
+      - name: Configurer Rust (stable + composants)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Installer les outils Cargo du gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v cargo-audit >/dev/null 2>&1 || cargo install cargo-audit --locked
+          command -v cargo-deny >/dev/null 2>&1 || cargo install cargo-deny --locked
+          command -v cargo-machete >/dev/null 2>&1 || cargo install cargo-machete --locked
+
+      - name: Vérifier le formatage
+        run: cargo fmt --all -- --check
+
+      - name: Vérifier le build debug multi-cibles
+        run: cargo check --all-targets
+
+      - name: Clippy (warnings → erreurs)
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Audit sécurité
+        run: cargo audit -q
+
+      - name: Vérifier cargo-deny
+        run: cargo deny check
+
+      - name: Dépendances inutilisées (cargo machete)
+        shell: bash
+        run: |
+          set -euo pipefail
+          machete_out="$(cargo machete --with-metadata 2>&1 || true)"
+          non_vendor_findings="$(echo "$machete_out" | grep " -- " | grep -v "vendor/" || true)"
+          if [ -n "$non_vendor_findings" ]; then
+            echo "$machete_out" >&2
+            echo "cargo machete a détecté des dépendances inutilisées hors vendor/." >&2
+            exit 1
+          fi
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Tests
+  # ─────────────────────────────────────────────────────────────────────────────
+  test:
+    name: Tests (lib + unit)
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer les dépendances système
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            libdbus-1-dev \
+            libudev-dev \
+            libssl-dev \
+            pkg-config \
+            cmake \
+            clang \
+            libclang-dev \
+            dbus \
+            at-spi2-core \
+            xvfb
+
+      - name: Configurer Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Exécuter les tests (sans affichage)
+        # xvfb-run fournit un display virtuel pour les tests qui pourraient
+        # initialiser GTK (évite les erreurs "cannot open display").
+        run: GDK_BACKEND=x11 LIBGL_ALWAYS_SOFTWARE=1 MESA_LOADER_DRIVER_OVERRIDE=llvmpipe xvfb-run -a cargo test --all-targets 2>&1
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Build release
+  # ─────────────────────────────────────────────────────────────────────────────
+  build-release:
+    name: Build release
+    runs-on: ubuntu-24.04
+    needs: [fmt-clippy, test]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer les dépendances système
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            libdbus-1-dev \
+            libudev-dev \
+            libssl-dev \
+            pkg-config \
+            cmake \
+            clang \
+            libclang-dev
+
+      - name: Configurer Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Upload artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: serial-term-linux-x86_64
+          path: target/release/serial-term
+          retention-days: 30
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Documentation
+  # ─────────────────────────────────────────────────────────────────────────────
+  doc:
+    name: cargo doc
+    runs-on: ubuntu-24.04
+    needs: [fmt-clippy]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer les dépendances système
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            libdbus-1-dev \
+            libudev-dev \
+            libssl-dev \
+            pkg-config \
+            cmake \
+            clang \
+            libclang-dev
+
+      - name: Configurer Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-doc-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Générer la documentation
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --document-private-items

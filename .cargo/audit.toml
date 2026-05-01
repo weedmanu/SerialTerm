@@ -1,0 +1,8 @@
+[advisories]
+ignore = [
+    # Ignoré temporairement en attendant une mise à jour amont des dépendances.
+    "RUSTSEC-2023-0071",
+    # Ignoré temporairement tant que la chaîne de dépendances n'a pas intégré
+    # les correctifs attendus en amont.
+    "RUSTSEC-2026-0097",
+]

@@ -1,0 +1,7 @@
+serial-term (0.95.0) focal; urgency=medium
+
+  * Mise à jour de version vers 0.95.0.
+  * Harmonisation du nom produit dans les scripts et la documentation.
+  * Nettoyage des références obsolètes dans la documentation.
+
+ -- M@nu <manu@example.com>  Fri, 01 May 2026 12:00:00 +0100
