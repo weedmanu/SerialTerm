@@ -32,4 +32,4 @@ Lecture recommandée :
 
 Le dernier lot publié avant nettoyage des archives documentait `121` tests, un durcissement testé du hot-unplug série Linux, un assainissement Debian/MATE du thème GTK `Yaru-MATE-*`, un soak qualifié de 30 minutes en charge lourde sans warning GTK/Adwaita visible, ainsi que les duplications transitives encore ouvertes à cette date.
 
-La version v0.95 du dépôt conserve un périmètre strictement série. Les nouveaux lots de preuves doivent se concentrer sur la robustesse du panneau série (timeout I/O persisté, alias stables `/dev/serial/by-id/...`, hot-unplug, reconnexion automatique) et la stabilité GTK headless.
+La préparation v1.0.0 du dépôt conserve un périmètre strictement série. Les nouveaux lots de preuves doivent se concentrer sur la robustesse du panneau série (timeout I/O persisté, alias stables `/dev/serial/by-id/...`, hot-unplug, reconnexion automatique), la stabilité GTK headless, le packaging Debian et la cohérence des métadonnées de publication.

@@ -1,9 +1,9 @@
 //! @file       ui/window.rs
 //! @author     M@nu
 //! @brief      Façade du module `window` — fenêtre principale `SerialTerm`.
-//! @version    0.95.0
+//! @version    1.0.0
 //! @date       2025-03-05
-//! @copyright  MIT License
+//! @copyright  GPL-3.0-or-later
 //!
 //! Ce module orchestre la fenêtre principale en découpant les responsabilités
 //! en sous-modules privés selon le principe de responsabilité unique (SRP) :

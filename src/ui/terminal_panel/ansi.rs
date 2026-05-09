@@ -8,7 +8,7 @@
 //!                      [`gtk4::TextBuffer`] + [`gtk4::TextTag`] pour l'affichage coloré.
 //! @version    1.0.0
 //! @date    2026-03-05
-//! @copyright Libre sous licence MIT.
+//! @copyright GPL-3.0-or-later.
 //! ############################################################################
 //!
 //! ## Architecture

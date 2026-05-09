@@ -1,6 +1,6 @@
 [package]
 name = "serial-term"
-version = "0.95.0"
+version = "1.0.0"
 edition = "2021"
 authors = ["M@nu <terraspi13@gmail.com>"]
 description = "Terminal série avec interface GTK4/Libadwaita"

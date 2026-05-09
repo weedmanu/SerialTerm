@@ -1,0 +1,22 @@
+.TH SERIAL-TERM 1 "2026-05-08" "SerialTerm 1.0.0" "User Commands"
+.SH NAME
+serial-term \- GTK4 serial terminal
+.SH SYNOPSIS
+.B serial-term
+.SH DESCRIPTION
+.B SerialTerm
+is a GTK4/Libadwaita desktop terminal for serial communication.
+It provides configurable serial parameters, ANSI terminal display, log export,
+themes, persistent JSON settings, and integrated conversion tools.
+.SH FILES
+.TP
+.I ~/.config/serial-term/settings.json
+Persistent user settings.
+.SH NOTES
+To access serial ports without root on Debian-based systems, add the user to the
+.B dialout
+group, then log out and log back in.
+.SH AUTHOR
+Manu <terraspi13@gmail.com>
+.SH COPYRIGHT
+GPL-3.0-or-later

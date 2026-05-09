@@ -12,7 +12,8 @@ debian/
 ├── rules                        # Règles de build (exécutable)
 ├── changelog                    # Historique des versions
 ├── copyright                    # Licence (format DEP-5)
-├── compat                       # Version debhelper (13)
+├── serial-term.1                # Page de manuel utilisateur
+├── serial-term.manpages         # Déclaration d'installation de la page man
 ├── source/format                # Format source (3.0 native)
 └── serial-term.desktop      # Entrée FDO Desktop (bilingue FR/EN)
 ```
@@ -31,14 +32,14 @@ bash scripts/build-deb.sh
 
 Le script exécute `cargo build --release` puis appelle `debuild` qui:
 - invoque `debian/rules`,
-- génère `serial-term_<version>_amd64.deb`, `.dsc` et `.tar.xz`.
+- génère `serial-term_<version>_amd64.deb`.
 
-Les artefacts sont déposés dans `build-dir/`.
+Les artefacts sont déposés dans `dist/debian/`.
 
 ## Installation locale
 
 ```bash
-sudo dpkg -i build-dir/serial-term_*.deb
+sudo dpkg -i dist/debian/serial-term_*.deb
 ```
 
 ## Référence des fichiers
@@ -49,7 +50,8 @@ Métadonnées du paquet :
 - `Package` : `serial-term`
 - `Architecture` : `amd64` (cross-architecture possible via `rustup target add`)
 - `Depends` : `libc6 (≥ 2.31)`, `libgtk-4-1 (≥ 4.0)`, `libadwaita-1 (≥ 0.7)`
-- `Maintainer` : M@nu
+- `Maintainer` : Manu
+- `Build-Depends` : inclut `debhelper-compat (= 13)`.
 
 ### debian/rules
 
@@ -75,6 +77,10 @@ dch -i   # Ajoute une entrée et incrémente la version
 
 Licence GPL-3.0-or-later au format DEP-5.
 
+### debian/serial-term.1
+
+Page de manuel installée avec le paquet pour documenter la commande `serial-term`.
+
 ### debian/serial-term.desktop
 
 Entrée FDO bilingue FR/EN. Champs clés :
@@ -94,7 +100,7 @@ Le workflow [`.github/workflows/package-deb.yml`](.github/workflows/package-deb.
 | `libgtk-4-dev`, `libadwaita-1-dev` | Headers GTK4/Libadwaita |
 | `libudev-dev` | Headers udev |
 | `debhelper`, `devscripts`, `fakeroot` | Outils Debian |
-| `pkg-config`, `cmake`, `clang` | Build helpers |
+| `pkgconf`, `cmake`, `clang` | Build helpers |
 
 ## Troubleshooting
 
@@ -113,13 +119,13 @@ sudo apt install devscripts
 ### Vérifier les dépendances du .deb généré
 
 ```bash
-dpkg -I build-dir/serial-term_*.deb | grep Depends
+dpkg -I dist/debian/serial-term_*.deb | grep Depends
 ```
 
 ### Lint Lintian
 
 ```bash
-lintian build-dir/serial-term_*.deb
+lintian dist/debian/serial-term_*.deb
 ```
 
 ## Cross-compilation

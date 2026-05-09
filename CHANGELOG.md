@@ -28,6 +28,15 @@ Le format suit [Keep a Changelog 1.1.0](https://keepachangelog.com/fr/1.1.0/) et
 
 **MSRV :** `1.75`. Une élévation de la MSRV est traitée comme un changement `MINOR` documenté dans la rubrique « Changed » de la version concernée.
 
+## [1.0.0] - 2026-05-08
+
+### Changed
+
+- Passage de la version applicative à `1.0.0`.
+- Alignement des métadonnées Debian et de la documentation de packaging.
+- Correction du workflow de packaging Debian pour publier les artefacts générés dans `dist/debian/`.
+- Harmonisation des en-têtes source avec la licence `GPL-3.0-or-later` déclarée par le projet.
+
 ## [0.95.0] - 2026-05-01
 
 ### Changed
@@ -36,4 +45,5 @@ Le format suit [Keep a Changelog 1.1.0](https://keepachangelog.com/fr/1.1.0/) et
 - Harmonisation du nom produit **SerialTerm** dans les scripts et la documentation.
 - Mise à jour des exemples d'installation Debian vers `serial-term_0.95.0*.deb`.
 
+[1.0.0]: https://github.com/TutoElectroWeb/SerialTerm/releases/tag/v1.0.0
 [0.95.0]: https://github.com/TutoElectroWeb/SerialTerm/releases/tag/v0.95.0

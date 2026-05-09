@@ -6,7 +6,7 @@
 #  - build-essential
 #  - debhelper
 #  - cargo (Rust)
-#  - libgtk-4-dev libadwaita-1-dev pkg-config
+#  - libgtk-4-dev libadwaita-1-dev pkgconf
 #
 # Usage :
 #   ./scripts/build-deb.sh
@@ -19,6 +19,19 @@ cd "$(dirname "$0")/.."
 
 PKG_NAME="serial-term"
 OUT_DIR="dist/debian"
+APP_VERSION="$(awk '
+    /^\[package\]/ { in_package = 1; next }
+    /^\[/ && in_package { exit }
+    in_package && /^version[[:space:]]*=/ {
+        gsub(/"/, "", $3);
+        print $3;
+        exit;
+    }
+' Cargo.toml)"
+if [ -z "$APP_VERSION" ]; then
+    echo "✗ Erreur : impossible de déterminer la version depuis Cargo.toml" >&2
+    exit 1
+fi
 mkdir -p "$OUT_DIR"
 
 echo "═══════════════════════════════════════════════════════════"
@@ -33,7 +46,7 @@ for cmd in cargo debuild lintian; do
         echo "✗ Erreur : '$cmd' n'est pas installé"
         echo ""
         echo "Installation sur Ubuntu/Debian :"
-        echo "  sudo apt install build-essential debhelper devscripts cargo lintian"
+        echo "  sudo apt install build-essential debhelper devscripts cargo lintian pkgconf"
         exit 1
     fi
 done
@@ -75,7 +88,7 @@ echo "📁 Fichier généré:"
 ls -lh "$OUT_DIR"/*.deb | tail -1 | awk '{print "   " $9 " (" $5 ")"}'
 echo ""
 echo "Installation :"
-echo "  sudo dpkg -i dist/debian/serial-term_0.95.0*.deb"
+echo "  sudo dpkg -i dist/debian/serial-term_${APP_VERSION}*.deb"
 echo ""
 echo "Désinstallation :"
 echo "  sudo apt remove serial-term"

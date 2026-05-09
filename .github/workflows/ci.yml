@@ -30,7 +30,7 @@ jobs:
             libdbus-1-dev \
             libudev-dev \
             libssl-dev \
-            pkg-config \
+            pkgconf \
             cmake \
             clang \
             libclang-dev
@@ -106,7 +106,7 @@ jobs:
             libdbus-1-dev \
             libudev-dev \
             libssl-dev \
-            pkg-config \
+            pkgconf \
             cmake \
             clang \
             libclang-dev \
@@ -154,7 +154,7 @@ jobs:
             libdbus-1-dev \
             libudev-dev \
             libssl-dev \
-            pkg-config \
+            pkgconf \
             cmake \
             clang \
             libclang-dev
@@ -204,7 +204,7 @@ jobs:
             libdbus-1-dev \
             libudev-dev \
             libssl-dev \
-            pkg-config \
+            pkgconf \
             cmake \
             clang \
             libclang-dev

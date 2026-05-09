@@ -3,7 +3,7 @@
 //! @brief      Runtime UI partagé: assainissement desktop et support de tests GTK.
 //! @version    1.0.0
 //! @date       2025-03-24
-//! @copyright  MIT License
+//! @copyright  GPL-3.0-or-later
 
 use gtk4::gio;
 use gtk4::prelude::SettingsExt;

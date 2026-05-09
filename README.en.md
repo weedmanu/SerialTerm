@@ -4,7 +4,7 @@
 
 SerialTerm is a GTK4/Libadwaita desktop terminal application focused on serial communication. It lets you finely tune a serial port (baud rate, bits, parity, flow control), display full ANSI streams in real time, and save sessions.
 
-> **Version v0.95 — Serial only.** This version focuses exclusively on serial use cases.
+> **Version v1.0.0 — Serial only.** This version focuses exclusively on serial use cases.
 
 ## Features
 
@@ -23,7 +23,7 @@ SerialTerm is a GTK4/Libadwaita desktop terminal application focused on serial c
 ### Debian package (.deb)
 
 ```bash
-sudo dpkg -i dist/debian/serial-term_0.95.0*.deb
+sudo dpkg -i dist/debian/serial-term_*.deb
 sudo apt -f install   # if dependencies are missing
 ```
 
@@ -39,7 +39,7 @@ sudo usermod -a -G dialout $USER
 Minimum requirements: Rust 1.75+, GTK 4.14+, Libadwaita 1.5+.
 
 ```bash
-sudo apt install build-essential libgtk-4-dev libadwaita-1-dev pkg-config cargo
+sudo apt install build-essential libgtk-4-dev libadwaita-1-dev pkgconf cargo
 ```
 
 ```bash

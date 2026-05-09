@@ -1,9 +1,9 @@
 //! @file       ui/mod.rs
 //! @author     M@nu
 //! @brief      Façade du module `ui` — interface GTK4/Libadwaita.
-//! @version    0.95.0
+//! @version    1.0.0
 //! @date       2025-03-05
-//! @copyright  MIT License
+//! @copyright  GPL-3.0-or-later
 //!
 //! Le module `ui` regroupe tous les composants de l'interface graphique :
 //! - `connection_panel` : formulaire série, ports, profils.

@@ -1,9 +1,9 @@
 //! @file       core/mod.rs
 //! @author     M@nu
 //! @brief      Façade du module `core` — logique métier sans dépendance UI.
-//! @version    0.95.0
+//! @version    1.0.0
 //! @date       2026-04-28
-//! @copyright  MIT License
+//! @copyright  GPL-3.0-or-later
 //!
 //! Le module `core` regroupe toute la logique métier indépendante de GTK :
 //! - `connection`     : trait unifié et acteur asynchrone de connexion.

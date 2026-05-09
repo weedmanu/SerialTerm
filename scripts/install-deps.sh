@@ -103,7 +103,7 @@ case "$DISTRO" in
         # Outils de build
         echo ""
         echo "📦 Outils..."
-        sudo apt install -y pkg-config libudev-dev xvfb
+        sudo apt install -y pkgconf libudev-dev xvfb
 
         echo ""
         echo "📦 Outils Cargo de validation..."

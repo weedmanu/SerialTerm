@@ -1,9 +1,9 @@
 //! @file       main.rs
 //! @author     M@nu
 //! @brief      Point d'entrée de `SerialTerm` — lints globaux + bootstrap.
-//! @version    0.95.0
+//! @version    1.0.0
 //! @date       2025-03-05
-//! @copyright  MIT License
+//! @copyright  GPL-3.0-or-later
 //!
 //! # Architecture
 //!

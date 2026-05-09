@@ -3,7 +3,7 @@
 //! @brief      Gestion de la langue et des traductions FR/EN.
 //! @version    1.0.0
 //! @date       2025-03-05
-//! @copyright  MIT License
+//! @copyright  GPL-3.0-or-later
 //!
 //! Ce module définit [`UiLang`], une énumération simple à deux variantes
 //! (`Fr` / `En`) avec des méthodes `const fn` retournant des chaînes

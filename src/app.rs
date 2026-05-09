@@ -3,7 +3,7 @@
 //! @brief      Bootstrap de l'application GTK4/Libadwaita.
 //! @version    1.0.0
 //! @date       2025-03-05
-//! @copyright  MIT License
+//! @copyright  GPL-3.0-or-later
 //!
 //! Ce module contient l'unique fonction publique `run()` qui :
 //! 1. Crée un [`libadwaita::Application`] avec son identifiant D-Bus.

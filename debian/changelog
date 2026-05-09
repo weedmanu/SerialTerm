@@ -1,7 +1,7 @@
-serial-term (0.95.0) focal; urgency=medium
+serial-term (1.0.0) focal; urgency=medium
 
-  * Mise à jour de version vers 0.95.0.
-  * Harmonisation du nom produit dans les scripts et la documentation.
-  * Nettoyage des références obsolètes dans la documentation.
+  * Prepare stable release 1.0.0.
+  * Fix Debian metadata and packaging documentation.
+  * Fix Debian artifact paths for the publication CI.
 
- -- M@nu <manu@example.com>  Fri, 01 May 2026 12:00:00 +0100
+ -- Manu <terraspi13@gmail.com>  Fri, 08 May 2026 09:30:00 +0100

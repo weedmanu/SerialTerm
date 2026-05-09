@@ -4,7 +4,7 @@
 
 SerialTerm est une application de terminal graphique GTK4/Libadwaita dédiée à la communication série. Elle permet de configurer finement un port série (débit, bits, parité, contrôle de flux), d'afficher en temps réel les flux ANSI complets et de sauvegarder les sessions.
 
-> **Version v0.95 — Série uniquement.** Cette version se concentre exclusivement sur les usages série.
+> **Version v1.0.0 — Série uniquement.** Cette version se concentre exclusivement sur les usages série.
 
 ## Fonctionnalités
 
@@ -23,7 +23,7 @@ SerialTerm est une application de terminal graphique GTK4/Libadwaita dédiée à
 ### Paquet Debian (.deb)
 
 ```bash
-sudo dpkg -i dist/debian/serial-term_0.95.0*.deb
+sudo dpkg -i dist/debian/serial-term_*.deb
 sudo apt -f install   # si dépendances manquantes
 ```
 
@@ -39,7 +39,7 @@ sudo usermod -a -G dialout $USER
 Prérequis minimaux : Rust 1.75+, GTK 4.14+, Libadwaita 1.5+.
 
 ```bash
-sudo apt install build-essential libgtk-4-dev libadwaita-1-dev pkg-config cargo
+sudo apt install build-essential libgtk-4-dev libadwaita-1-dev pkgconf cargo
 ```
 
 ```bash

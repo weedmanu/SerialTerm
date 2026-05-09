@@ -1,8 +1,8 @@
 Source: serial-term
-Section: utility
+Section: utils
 Priority: optional
-Maintainer: M@nu <manu@example.com>
-Build-Depends: debhelper-compat (= 13), cargo, libgtk-4-dev, libadwaita-1-dev, pkg-config
+Maintainer: Manu <terraspi13@gmail.com>
+Build-Depends: debhelper-compat (= 13), cargo, libgtk-4-dev, libadwaita-1-dev, pkgconf
 Standards-Version: 4.6.0
 Homepage: https://github.com/weedmanu/SerialTerm
 
@@ -13,12 +13,8 @@ Description: Terminal graphique pour connexions série
  SerialTerm est une application de terminal permettant de communiquer
  avec des appareils via port série dans une interface GTK.
  .
- Fonctionnalités :
+ Fonctionnalités principales :
  .
- - Connexion série configurable (débit, bits, parité, arrêt, flux)
- - Émulation terminal ANSI complète (couleurs, SGR)
- - Affichage en temps réel avec scrollback configurable
- - Outils intégrés : calculatrice et convertisseur DEC/HEX/BIN
- - Sauvegarde des logs en fichier texte
- - Thèmes (Clair, Sombre, Hacker)
- - Configuration persistante en JSON
+ Connexion série configurable, émulation terminal ANSI, affichage en
+ temps réel avec scrollback, outils intégrés, sauvegarde des logs,
+ thèmes et configuration persistante en JSON.

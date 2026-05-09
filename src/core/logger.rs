@@ -3,7 +3,7 @@
 //! @brief      Initialisation et configuration du système de logging.
 //! @version    1.0.0
 //! @date       2025-03-05
-//! @copyright  MIT License
+//! @copyright  GPL-3.0-or-later
 //!
 //! Ce module fournit deux fonctions d'initialisation :
 //!

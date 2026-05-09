@@ -3,7 +3,7 @@
 //! @brief      Barre d'en-tête GTK avec boutons d'action rapide.
 //! @version    1.0.0
 //! @date       2025-03-05
-//! @copyright  MIT License
+//! @copyright  GPL-3.0-or-later
 //!
 //! Ce module définit [`AppHeaderBar`], la barre de titre de l'application.
 //!
@@ -48,7 +48,7 @@ impl AppHeaderBar {
 
         // Bouton toggle sidebar — créé ici, positionné dans la toolbar par shell.rs.
         let toggle_sidebar_button = gtk4::ToggleButton::builder()
-            .icon_name("view-sidebar-symbolic") // Icône standard GTK (panneau latéral).
+            .icon_name("sidebar-show-symbolic") // Icône standard Adwaita (panneau latéral).
             .tooltip_text(lang.toggle_sidebar_tooltip()) // Tooltip localisé FR/EN.
             .active(false) // Panneau MASQUÉ au démarrage.
             .build();
