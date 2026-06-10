@@ -33,6 +33,8 @@ async-channel = "2.5.0"
 async-trait = "0.1.89"
 vte = { version = "0.15.0", features = ["ansi"] }
 
+# Forks vendorés : motif et critère de sortie suivis dans DEVELOPMENT.md
+# (section « Suivi des forks supply-chain (vendor/) »). À revérifier trimestriellement.
 [patch.crates-io]
 serialport = { path = "vendor/serialport" }
 unescaper = { path = "vendor/unescaper" }

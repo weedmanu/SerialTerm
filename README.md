@@ -39,7 +39,7 @@ sudo usermod -a -G dialout $USER
 Prérequis minimaux : Rust 1.75+, GTK 4.14+, Libadwaita 1.5+.
 
 ```bash
-sudo apt install build-essential libgtk-4-dev libadwaita-1-dev pkgconf cargo
+sudo apt install build-essential libgtk-4-dev libadwaita-1-dev libudev-dev pkgconf cargo
 ```
 
 ```bash
