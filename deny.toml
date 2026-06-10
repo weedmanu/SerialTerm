@@ -11,6 +11,10 @@ yanked = "deny"
 [licenses]
 version = 2
 confidence-threshold = 0.8
+# Licences permissives courantes (BSD-3-Clause, ISC, Zlib...) pre-autorisees a titre
+# preventif : un bump de dependance peut les reintroduire et elles seraient acceptees.
+# On evite donc le warning `license-not-encountered` sans relacher la politique.
+unused-allowed-license = "allow"
 allow = [
     "MIT",
     "Apache-2.0",
