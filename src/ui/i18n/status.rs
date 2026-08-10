@@ -189,6 +189,14 @@ impl UiLang {
         }
     }
 
+    /// Unité du débit série affichée dans la barre d'état.
+    pub const fn serial_baud_unit(self) -> &'static str {
+        match self {
+            Self::Fr => "bauds",
+            Self::En => "baud",
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Panneau de saisie (input_panel.rs)
     // -------------------------------------------------------------------------

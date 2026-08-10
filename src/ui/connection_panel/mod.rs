@@ -185,7 +185,7 @@ mod tests {
     }
 
     #[gtk4::test]
-    fn serial_ports_show_friendly_name_and_selected_tooltip() {
+    fn serial_ports_show_only_port_and_keep_details_available() {
         let panel = SerialPanel::new(UiLang::Fr);
         let ports = vec![SerialPortInfo {
             device: "/dev/ttyACM0".to_string(),
@@ -200,7 +200,11 @@ mod tests {
 
         assert_eq!(
             SerialPanel::dropdown_text(&panel.port_dropdown).as_deref(),
-            Some("/dev/ttyACM0 — STM32 ST-LINK")
+            Some("/dev/ttyACM0")
+        );
+        assert_eq!(
+            panel.selected_port_friendly_name().as_deref(),
+            Some("STM32 ST-LINK")
         );
         let tooltip = panel.port_dropdown.tooltip_text().unwrap_or_default();
         assert!(tooltip.contains("STM32 ST-LINK"));

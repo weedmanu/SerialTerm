@@ -75,7 +75,7 @@ Strict hexagonal architecture:
 - `src/application/`: use cases (validation, transformation);
 - `src/ui/`: GTK4/Libadwaita presentation layer.
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for conventions, tooling, and the validation gate.
+See [DEVELOPMENT.md](DEVELOPMENT.md) for conventions and tooling, and [PLAN_CORRECTIONS_AMELIORATIONS.md](PLAN_CORRECTIONS_AMELIORATIONS.md) for the technical roadmap.
 
 ## Main dependencies
 

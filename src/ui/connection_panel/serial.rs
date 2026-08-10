@@ -22,6 +22,7 @@ use super::common::{
 struct PortEntry {
     device: String,
     stable_path: String,
+    friendly_name: String,
     tooltip: String,
 }
 
@@ -40,7 +41,7 @@ impl PortEntry {
 }
 
 fn build_port_dropdown_label(port: &crate::core::serial_manager::SerialPortInfo) -> String {
-    format!("{} — {}", port.device, port.friendly_name)
+    port.device.clone()
 }
 
 fn build_port_dropdown_tooltip(
@@ -349,6 +350,7 @@ impl SerialPanel {
             entries.push(PortEntry {
                 device: String::new(),
                 stable_path: String::new(),
+                friendly_name: String::new(),
                 tooltip: self.lang.serial_no_port_tooltip().to_string(),
             });
         } else {
@@ -358,6 +360,7 @@ impl SerialPanel {
                 entries.push(PortEntry {
                     device: port.device.clone(),
                     stable_path: port.stable_path.clone(),
+                    friendly_name: port.friendly_name.clone(),
                     tooltip: build_port_dropdown_tooltip(self.lang, port),
                 });
             }
@@ -406,6 +409,16 @@ impl SerialPanel {
     /// Retourne le port à utiliser effectivement pour la connexion.
     pub fn effective_port(&self) -> Option<String> {
         self.selected_port()
+    }
+
+    /// Retourne le nom convivial du port sélectionné pour la barre d'état.
+    pub fn selected_port_friendly_name(&self) -> Option<String> {
+        let idx = usize::try_from(self.port_dropdown.selected()).ok()?;
+        self.port_entries
+            .borrow()
+            .get(idx)
+            .map(|entry| entry.friendly_name.clone())
+            .filter(|name| !name.is_empty())
     }
 
     /// Retourne si l'auto-sélection du port unique est active.

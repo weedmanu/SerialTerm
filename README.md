@@ -75,7 +75,7 @@ Architecture hexagonale stricte :
 - `src/application/` : cas d'usage (validation, transformation) ;
 - `src/ui/` : présentation GTK4/Libadwaita.
 
-Voir [DEVELOPMENT.md](DEVELOPMENT.md) pour les conventions, l'outillage et le gate de validation.
+Voir [DEVELOPMENT.md](DEVELOPMENT.md) pour les conventions et l'outillage, ainsi que [PLAN_CORRECTIONS_AMELIORATIONS.md](PLAN_CORRECTIONS_AMELIORATIONS.md) pour la feuille de route.
 
 ## Dépendances principales
 

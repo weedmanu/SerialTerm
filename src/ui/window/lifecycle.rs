@@ -142,18 +142,30 @@ impl MainWindow {
                 let type_label = match conn_type {
                     ConnectionType::Serial => self.lang.serial_label(),
                 };
+                log::debug!("Connexion établie : {description}");
+                let baudrate = self.connection_panel.serial_panel.selected_baudrate();
+                let baud_unit = self.lang.serial_baud_unit();
+                let connected_status = self
+                    .connection_panel
+                    .serial_panel
+                    .selected_port_friendly_name()
+                    .map_or_else(
+                        || {
+                            format!(
+                                "{} {type_label} — {baudrate} {baud_unit}",
+                                self.lang.connected_system()
+                            )
+                        },
+                        |device| {
+                            format!(
+                                "{} {type_label} — {device} @ {baudrate} {baud_unit}",
+                                self.lang.connected_system()
+                            )
+                        },
+                    );
                 self.set_connected(true);
-                self.set_status(
-                    &format!(
-                        "{} {type_label} — {description}",
-                        self.lang.connected_system()
-                    ),
-                    true,
-                );
-                self.show_bottom_notice(&format!(
-                    "{} [{type_label}] {description}",
-                    self.lang.connected_system()
-                ));
+                self.set_status(&connected_status, true);
+                self.show_bottom_notice(&connected_status);
                 self.input.grab_focus();
                 self.sync_terminal_size();
                 true
@@ -599,6 +611,38 @@ mod tests {
         window.handle_disconnect();
 
         assert_eq!(window.terminal.get_text(), "");
+
+        close_window_for_tests(&window);
+    }
+
+    #[gtk4::test]
+    fn connected_status_shows_device_name_without_port_path() {
+        crate::ui::runtime::sanitize_problematic_desktop_theme();
+        let window = build_window_for_tests();
+        let ports = vec![crate::core::serial_manager::SerialPortInfo {
+            device: "/dev/ttyACM0".to_string(),
+            manufacturer: "STMicroelectronics".to_string(),
+            description: "STM32 STLink".to_string(),
+            friendly_name: "STM32 ST-LINK".to_string(),
+            stable_path: "/dev/serial/by-id/usb-STMicroelectronics_STM32_STLink_123-if02"
+                .to_string(),
+        }];
+        window
+            .connection_panel
+            .serial_panel
+            .update_ports_from_list(&ports);
+
+        let should_continue = window.handle_connection_event(Ok(ConnectionEvent::Connected {
+            conn_type: ConnectionType::Serial,
+            description: "/dev/serial/by-id/usb-STMicroelectronics_STM32_STLink_123-if02 @ 115200"
+                .to_string(),
+        }));
+
+        assert!(should_continue);
+        assert!(window.status_label.label().contains("STM32 ST-LINK"));
+        assert!(window.status_label.label().contains("115200 bauds"));
+        assert!(!window.status_label.label().contains("/dev/"));
+        assert!(window.status_dot.has_css_class("status-dot-connected"));
 
         close_window_for_tests(&window);
     }
