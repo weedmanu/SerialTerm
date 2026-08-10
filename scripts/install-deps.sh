@@ -12,6 +12,7 @@ if [ -z "${BASH_VERSION:-}" ]; then
 fi
 
 set -e
+set -o pipefail
 
 # Prioriser rustup si présent pour éviter les décalages avec un cargo système.
 if [ -d "${HOME}/.cargo/bin" ]; then
@@ -33,6 +34,36 @@ install_cargo_tool() {
     fi
 }
 
+install_rust_components() {
+    if command -v rustup &> /dev/null; then
+        echo "   ↻ Installation des composants Rust requis..."
+        rustup component add rustfmt clippy llvm-tools rust-src
+    fi
+}
+
+install_cargo_validation_tools() {
+    echo ""
+    echo "📦 Outils Cargo de validation..."
+    install_cargo_tool cargo-audit cargo-audit
+    install_cargo_tool cargo-deny cargo-deny
+    install_cargo_tool cargo-nextest cargo-nextest
+    install_cargo_tool cargo-llvm-cov cargo-llvm-cov
+    install_cargo_tool cargo-machete cargo-machete
+    install_cargo_tool cargo-outdated cargo-outdated
+    install_cargo_tool cargo-deb cargo-deb
+}
+
+verify_pkgconfig_gtk() {
+    # Vérification rapide des .pc critiques utilisés pendant cargo check/clippy/test
+    echo ""
+    echo "📦 Vérification pkg-config (GTK/GLib)..."
+    pkg-config --exists gtk4 glib-2.0 gio-2.0 gobject-2.0 pango cairo gdk-pixbuf-2.0 graphene-gobject-1.0 || {
+        echo "✗ Des dépendances pkg-config GTK/GLib sont manquantes." >&2
+        echo "  Relancer ce script et vérifier les paquets dev installés ci-dessus." >&2
+        exit 1
+    }
+}
+
 echo "═══════════════════════════════════════════════════════════"
 echo "  SerialTerm - Installation des dépendances"
 echo "═══════════════════════════════════════════════════════════"
@@ -42,10 +73,24 @@ echo ""
 if [ -f /etc/os-release ]; then
     . /etc/os-release
     DISTRO=$ID
+    DISTRO_LIKE=${ID_LIKE:-}
 else
     echo "✗ Impossible de détecter la distribution"
     exit 1
 fi
+
+# Rattacher les dérivées (Mint/Pop!_OS, Rocky/Alma, Manjaro/EndeavourOS, ...)
+# à la famille de base afin de réutiliser le bon bloc d'installation.
+case "$DISTRO" in
+    ubuntu|debian|fedora|arch) ;;
+    *)
+        case " $DISTRO_LIKE " in
+            *" ubuntu "*|*" debian "*) DISTRO="debian" ;;
+            *" fedora "*|*" rhel "*) DISTRO="fedora" ;;
+            *" arch "*) DISTRO="arch" ;;
+        esac
+        ;;
+esac
 
 echo "📦 Distribution détectée : $DISTRO"
 echo ""
@@ -81,10 +126,7 @@ case "$DISTRO" in
             echo "   ✓ Rust est déjà installé"
         fi
 
-        if command -v rustup &> /dev/null; then
-            echo "   ↻ Installation des composants Rust requis..."
-            rustup component add rustfmt clippy llvm-tools rust-src
-        fi
+        install_rust_components
         
         # Dépendances GTK4/Libadwaita + libs de dev explicites
         # (évite les régressions si des dépendances transitives changent)
@@ -105,24 +147,8 @@ case "$DISTRO" in
         echo "📦 Outils..."
         sudo apt install -y pkgconf libudev-dev xvfb
 
-        echo ""
-        echo "📦 Outils Cargo de validation..."
-        install_cargo_tool cargo-audit cargo-audit
-        install_cargo_tool cargo-deny cargo-deny
-        install_cargo_tool cargo-nextest cargo-nextest
-        install_cargo_tool cargo-llvm-cov cargo-llvm-cov
-        install_cargo_tool cargo-machete cargo-machete
-        install_cargo_tool cargo-outdated cargo-outdated
-        install_cargo_tool cargo-deb cargo-deb
-
-        # Vérification rapide des .pc critiques utilisés pendant cargo check/clippy/test
-        echo ""
-        echo "📦 Vérification pkg-config (GTK/GLib)..."
-        pkg-config --exists gtk4 glib-2.0 gio-2.0 gobject-2.0 pango cairo gdk-pixbuf-2.0 graphene-gobject-1.0 || {
-            echo "✗ Des dépendances pkg-config GTK/GLib sont manquantes." >&2
-            echo "  Relancer ce script et vérifier les paquets dev installés ci-dessus." >&2
-            exit 1
-        }
+        install_cargo_validation_tools
+        verify_pkgconfig_gtk
         
         ;;
     fedora)
@@ -134,19 +160,23 @@ case "$DISTRO" in
         
         echo "📦 Build essentials..."
         sudo dnf groupinstall -y "Development Tools"
-        sudo dnf install -y rpm-build
+        sudo dnf install -y rpm-build openssl-devel cmake
         
         if ! command -v cargo &> /dev/null; then
             echo "   Installation de rustup..."
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
             source "$HOME/.cargo/env"
         fi
+        install_rust_components
         
         echo "📦 Dépendances GTK4..."
         sudo dnf install -y gtk4-devel libadwaita-devel
         
         echo "📦 Outils..."
         sudo dnf install -y pkg-config xorg-x11-server-Xvfb
+
+        install_cargo_validation_tools
+        verify_pkgconfig_gtk
         
         ;;
     arch)
@@ -154,19 +184,23 @@ case "$DISTRO" in
         echo ""
         
         echo "📦 Build essentials..."
-        sudo pacman -Sy --noconfirm base-devel
+        sudo pacman -Sy --noconfirm base-devel openssl cmake
         
         if ! command -v cargo &> /dev/null; then
             echo "Installation de rustup..."
             sudo pacman -Sy --noconfirm rustup
             rustup default stable
         fi
+        install_rust_components
         
         echo "📦 Dépendances GTK4..."
         sudo pacman -Sy --noconfirm gtk4 libadwaita
         
         echo "📦 Outils..."
         sudo pacman -Sy --noconfirm pkg-config xorg-server-xvfb
+
+        install_cargo_validation_tools
+        verify_pkgconfig_gtk
         
         ;;
     *)
