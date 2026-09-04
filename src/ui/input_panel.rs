@@ -82,11 +82,6 @@ impl InputPanel {
         self.entry.text().to_string()
     }
 
-    /// Efface le champ de saisie.
-    pub fn clear(&self) {
-        self.entry.set_text("");
-    }
-
     /// Retourne le suffixe de fin de ligne sélectionné.
     pub fn selected_line_ending(&self) -> &str {
         match self.line_ending_dropdown.selected() {

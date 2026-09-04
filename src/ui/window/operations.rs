@@ -1,6 +1,7 @@
 use gtk4::prelude::*;
 use gtk4::{gio, FileDialog};
 use libadwaita::prelude::*;
+use std::rc::Rc;
 
 use crate::application::use_cases::{
     apply_serial_settings, build_terminal_payload, create_serial_config, SerialConfigError,
@@ -113,7 +114,7 @@ impl MainWindow {
     }
 
     /// Envoie la ligne saisie vers la connexion active.
-    pub(super) fn send_data(&self) {
+    pub(super) fn send_data(self: &Rc<Self>) {
         let text = self.input.get_text();
         let line_ending = self.input.selected_line_ending();
         let Some(data) = build_terminal_payload(&text, line_ending) else {
@@ -122,21 +123,38 @@ impl MainWindow {
 
         let data_len = u64::try_from(data.len()).unwrap_or(0);
 
-        if let Some(tx) = self.connection_tx.borrow().as_ref() {
-            if let Err(e) = tx.try_send(ConnectionCommand::SendData(data)) {
-                self.terminal
-                    .append_error(&format!("{} {e}", self.lang.send_error()));
-            } else {
-                self.tx_bytes
-                    .set(self.tx_bytes.get().saturating_add(data_len));
-                self.update_stats();
-                self.terminal.append_sent(&format!("→ {text}\n"));
-                self.input.clear();
-                self.input.grab_focus();
-            }
-        } else {
+        let Some(tx) = self.connection_tx.borrow().as_ref().cloned() else {
             self.terminal.append_error(self.lang.not_connected_error());
-        }
+            return;
+        };
+
+        let window = Rc::downgrade(self);
+        let data_for_async = data;
+        let payload = text;
+        gtk4::glib::spawn_future_local(async move {
+            let Some(window) = window.upgrade() else {
+                return;
+            };
+
+            match tx.send(ConnectionCommand::SendData(data_for_async)).await {
+                Ok(()) => {
+                    window
+                        .tx_bytes
+                        .set(window.tx_bytes.get().saturating_add(data_len));
+                    window.update_stats();
+                    window.terminal.append_sent(&format!("→ {payload}\n"));
+                    window.input.entry.set_text("");
+                    window.input.entry.grab_focus();
+                }
+                Err(_) => {
+                    window.terminal.append_error(&format!(
+                        "{} {}",
+                        window.lang.send_error(),
+                        window.lang.status_disconnected()
+                    ));
+                }
+            }
+        });
     }
 
     /// Sauvegarde le terminal dans un fichier texte.

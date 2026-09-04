@@ -500,13 +500,13 @@ impl Connection for SerialManager {
     async fn send(&mut self, data: &[u8]) -> Result<usize> {
         let port = self.port.as_mut().context("Port série non connecté")?;
 
-        let written = match port.write(data).await {
-            Ok(written) => written,
+        match port.write_all(data).await {
+            Ok(()) => {}
             Err(error) => {
                 self.state = classify_serial_io_error(&error);
                 bail!(serial_io_context("l'écriture", &error));
             }
-        };
+        }
 
         if let Err(error) = port.flush().await {
             self.state = classify_serial_io_error(&error);
@@ -515,8 +515,8 @@ impl Connection for SerialManager {
 
         self.bytes_sent = self
             .bytes_sent
-            .saturating_add(u64::try_from(written).unwrap_or(0));
-        Ok(written)
+            .saturating_add(u64::try_from(data.len()).unwrap_or(0));
+        Ok(data.len())
     }
 
     async fn read(&mut self) -> Result<Vec<u8>> {

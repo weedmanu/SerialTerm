@@ -25,8 +25,11 @@ impl MainWindow {
             &saved_theme_id.to_variant(),
         );
         {
-            let w = win.clone();
+            let w = Rc::downgrade(win);
             theme_action.connect_activate(move |action, param| {
+                let Some(w) = w.upgrade() else {
+                    return;
+                };
                 if let Some(theme_name) = param.and_then(gtk4::glib::Variant::get::<String>) {
                     let theme = Theme::from_str_name(&theme_name);
                     let normalized_theme_id = theme.id();
@@ -55,8 +58,11 @@ impl MainWindow {
                 .to_variant(),
         );
         {
-            let w = win.clone();
+            let w = Rc::downgrade(win);
             lang_action.connect_activate(move |action, param| {
+                let Some(w) = w.upgrade() else {
+                    return;
+                };
                 if let Some(lang_id) = param.and_then(gtk4::glib::Variant::get::<String>) {
                     action.set_state(&lang_id.to_variant());
                     w.settings.borrow_mut().set_language(&lang_id);
@@ -69,8 +75,11 @@ impl MainWindow {
 
         let save_action = gio::SimpleAction::new("save-logs", None);
         {
-            let w = win.clone();
+            let w = Rc::downgrade(win);
             save_action.connect_activate(move |_, _| {
+                let Some(w) = w.upgrade() else {
+                    return;
+                };
                 w.save_logs();
             });
         }
@@ -78,8 +87,11 @@ impl MainWindow {
 
         let tools_action = gio::SimpleAction::new("open-tools", None);
         {
-            let w = win.clone();
+            let w = Rc::downgrade(win);
             tools_action.connect_activate(move |_, _| {
+                let Some(w) = w.upgrade() else {
+                    return;
+                };
                 open_tools_dialog(&w.window, w.lang);
             });
         }
@@ -87,9 +99,12 @@ impl MainWindow {
 
         let view_logs_action = gio::SimpleAction::new("view-logs", None);
         {
-            let w = win.clone();
+            let w = Rc::downgrade(win);
             #[allow(clippy::clone_on_ref_ptr)]
             view_logs_action.connect_activate(move |_, _| {
+                let Some(w) = w.upgrade() else {
+                    return;
+                };
                 let wc = w.clone();
                 let get_logs = std::rc::Rc::new(move || wc.terminal.get_text());
                 crate::ui::log_viewer::open_log_viewer(&w.window, w.lang, get_logs);
@@ -99,8 +114,11 @@ impl MainWindow {
 
         let clear_action = gio::SimpleAction::new("clear-terminal", None);
         {
-            let w = win.clone();
+            let w = Rc::downgrade(win);
             clear_action.connect_activate(move |_, _| {
+                let Some(w) = w.upgrade() else {
+                    return;
+                };
                 w.terminal.clear();
                 w.show_bottom_notice(w.lang.terminal_cleared());
             });
@@ -109,18 +127,25 @@ impl MainWindow {
 
         let new_terminal_action = gio::SimpleAction::new("new-terminal", None);
         {
-            let w = win.clone();
+            let w = Rc::downgrade(win);
             #[allow(clippy::clone_on_ref_ptr)]
-            new_terminal_action.connect_activate(move |_, _| match std::env::current_exe() {
-                Ok(exe_path) => {
-                    if let Err(e) = Command::new(exe_path).spawn() {
-                        w.terminal
-                            .append_error(&format!("{} {e}", w.lang.new_terminal_spawn_error()));
+            new_terminal_action.connect_activate(move |_, _| {
+                let Some(w) = w.upgrade() else {
+                    return;
+                };
+                match std::env::current_exe() {
+                    Ok(exe_path) => {
+                        if let Err(e) = Command::new(exe_path).spawn() {
+                            w.terminal.append_error(&format!(
+                                "{} {e}",
+                                w.lang.new_terminal_spawn_error()
+                            ));
+                        }
                     }
-                }
-                Err(e) => {
-                    w.terminal
-                        .append_error(&format!("{} {e}", w.lang.new_terminal_exe_error()));
+                    Err(e) => {
+                        w.terminal
+                            .append_error(&format!("{} {e}", w.lang.new_terminal_exe_error()));
+                    }
                 }
             });
         }
@@ -128,9 +153,12 @@ impl MainWindow {
 
         let shortcuts_action = gio::SimpleAction::new("show-shortcuts", None);
         {
-            let w = win.clone();
+            let w = Rc::downgrade(win);
             #[allow(clippy::clone_on_ref_ptr)]
             shortcuts_action.connect_activate(move |_, _| {
+                let Some(w) = w.upgrade() else {
+                    return;
+                };
                 open_shortcuts_dialog(&w.window, w.lang);
             });
         }
@@ -138,8 +166,11 @@ impl MainWindow {
 
         let search_action = gio::SimpleAction::new("search-terminal", None);
         {
-            let w = win.clone();
+            let w = Rc::downgrade(win);
             search_action.connect_activate(move |_, _| {
+                let Some(w) = w.upgrade() else {
+                    return;
+                };
                 w.terminal.toggle_search();
             });
         }
@@ -147,8 +178,11 @@ impl MainWindow {
 
         let copy_terminal_action = gio::SimpleAction::new("copy-terminal-selection", None);
         {
-            let w = win.clone();
+            let w = Rc::downgrade(win);
             copy_terminal_action.connect_activate(move |_, _| {
+                let Some(w) = w.upgrade() else {
+                    return;
+                };
                 if let Some((start, end)) = w.terminal.buffer.selection_bounds() {
                     let text = w.terminal.buffer.text(&start, &end, false);
                     if !text.is_empty() {
@@ -161,8 +195,11 @@ impl MainWindow {
 
         let paste_input_action = gio::SimpleAction::new("paste-input", None);
         {
-            let w = win.clone();
+            let w = Rc::downgrade(win);
             paste_input_action.connect_activate(move |_, _| {
+                let Some(w) = w.upgrade() else {
+                    return;
+                };
                 let clipboard = w.window.clipboard();
                 let entry = w.input.entry.clone();
 
@@ -181,8 +218,11 @@ impl MainWindow {
 
         let find_next_action = gio::SimpleAction::new("find-next", None);
         {
-            let w = win.clone();
+            let w = Rc::downgrade(win);
             find_next_action.connect_activate(move |_, _| {
+                let Some(w) = w.upgrade() else {
+                    return;
+                };
                 w.terminal.find_next();
             });
         }
@@ -190,8 +230,11 @@ impl MainWindow {
 
         let find_prev_action = gio::SimpleAction::new("find-prev", None);
         {
-            let w = win.clone();
+            let w = Rc::downgrade(win);
             find_prev_action.connect_activate(move |_, _| {
+                let Some(w) = w.upgrade() else {
+                    return;
+                };
                 w.terminal.find_prev();
             });
         }
@@ -199,8 +242,11 @@ impl MainWindow {
 
         let about_action = gio::SimpleAction::new("about", None);
         {
-            let w = win.clone();
+            let w = Rc::downgrade(win);
             about_action.connect_activate(move |_, _| {
+                let Some(w) = w.upgrade() else {
+                    return;
+                };
                 let about = libadwaita::AboutDialog::builder()
                     .application_name("SerialTerm")
                     .version(env!("CARGO_PKG_VERSION"))
@@ -219,8 +265,11 @@ impl MainWindow {
 
         let contact_action = gio::SimpleAction::new("show-contact", None);
         {
-            let w = win.clone();
+            let w = Rc::downgrade(win);
             contact_action.connect_activate(move |_, _| {
+                let Some(w) = w.upgrade() else {
+                    return;
+                };
                 show_contact_dialog(&w.window, w.lang);
             });
         }
@@ -228,8 +277,11 @@ impl MainWindow {
 
         let report_issue_action = gio::SimpleAction::new("report-issue", None);
         {
-            let w = win.clone();
+            let w = Rc::downgrade(win);
             report_issue_action.connect_activate(move |_, _| {
+                let Some(w) = w.upgrade() else {
+                    return;
+                };
                 let url = "https://github.com/TutoElectroWeb/SerialTerm/issues/new/choose";
                 if let Err(e) =
                     gio::AppInfo::launch_default_for_uri(url, None::<&gio::AppLaunchContext>)
@@ -243,8 +295,11 @@ impl MainWindow {
 
         let close_action = gio::SimpleAction::new("close", None);
         {
-            let w = win.clone();
+            let w = Rc::downgrade(win);
             close_action.connect_activate(move |_, _| {
+                let Some(w) = w.upgrade() else {
+                    return;
+                };
                 w.window.close();
             });
         }

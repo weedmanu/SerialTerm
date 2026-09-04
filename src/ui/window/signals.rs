@@ -13,26 +13,36 @@ impl MainWindow {
     #[allow(clippy::clone_on_ref_ptr, clippy::too_many_lines)]
     pub(super) fn setup_signals(win: &Rc<Self>) {
         {
-            let w = win.clone();
+            let w = Rc::downgrade(win);
             win.connect_button.connect_clicked(move |_| {
+                let Some(w) = w.upgrade() else {
+                    return;
+                };
                 w.toggle_connection();
             });
         }
 
         {
-            let w = win.clone();
+            let w = Rc::downgrade(win);
             win.clear_button.connect_clicked(move |_| {
+                let Some(w) = w.upgrade() else {
+                    return;
+                };
                 w.terminal.clear();
                 w.show_bottom_notice(w.lang.terminal_cleared());
             });
         }
 
         {
-            let w = win.clone();
+            let w = Rc::downgrade(win);
             win.connection_panel
                 .serial_panel
                 .refresh_button
                 .connect_clicked(move |_| {
+                    let Some(w) = w.upgrade() else {
+                        return;
+                    };
+
                     let refresh_button = w.connection_panel.serial_panel.refresh_button.clone();
                     refresh_button.set_sensitive(false);
                     refresh_button.set_icon_name("process-working-symbolic");
@@ -42,22 +52,21 @@ impl MainWindow {
                         Vec<crate::core::serial_manager::SerialPortInfo>,
                     >(1);
 
-                    let w2 = w.clone();
                     glib::spawn_future_local(async move {
                         if let Ok(ports) = receiver.recv().await {
-                            w2.connection_panel
+                            w.connection_panel
                                 .serial_panel
                                 .refresh_button
                                 .set_sensitive(true);
-                            w2.connection_panel
+                            w.connection_panel
                                 .serial_panel
                                 .refresh_button
                                 .set_icon_name("view-refresh-symbolic");
-                            w2.connection_panel
+                            w.connection_panel
                                 .serial_panel
                                 .update_ports_from_list(&ports);
-                            w2.show_bottom_notice(w2.lang.serial_ports_refreshed());
-                            w2.show_toast(w2.lang.serial_ports_refreshed());
+                            w.show_bottom_notice(w.lang.serial_ports_refreshed());
+                            w.show_toast(w.lang.serial_ports_refreshed());
                         }
                     });
 
@@ -69,31 +78,44 @@ impl MainWindow {
         }
 
         {
-            let w = win.clone();
+            let w = Rc::downgrade(win);
             win.input.send_button.connect_clicked(move |_| {
+                let Some(w) = w.upgrade() else {
+                    return;
+                };
                 w.send_data();
             });
         }
 
         {
-            let w = win.clone();
+            let w = Rc::downgrade(win);
             win.input.entry.connect_activate(move |_| {
+                let Some(w) = w.upgrade() else {
+                    return;
+                };
                 w.send_data();
             });
         }
 
         {
-            let w = win.clone();
+            let w = Rc::downgrade(win);
             win.header.save_log_button.connect_clicked(move |_| {
+                let Some(w) = w.upgrade() else {
+                    return;
+                };
                 w.save_logs();
             });
         }
 
         {
-            let w = win.clone();
+            let w = Rc::downgrade(win);
             win.input
                 .line_ending_dropdown
                 .connect_selected_notify(move |dropdown| {
+                    let Some(w) = w.upgrade() else {
+                        return;
+                    };
+
                     let le_str = match dropdown.selected() {
                         1 => "CR",
                         2 => "CRLF",
@@ -106,10 +128,14 @@ impl MainWindow {
 
         {
             let terminal = win.terminal.text_view.clone();
-            let w = win.clone();
+            let w = Rc::downgrade(win);
             win.input
                 .stop_scroll_checkbox
                 .connect_toggled(move |checkbox| {
+                    let Some(w) = w.upgrade() else {
+                        return;
+                    };
+
                     let auto_scroll = !checkbox.is_active();
                     w.terminal.set_auto_scroll_enabled(auto_scroll);
                     if auto_scroll {
@@ -122,8 +148,12 @@ impl MainWindow {
         }
 
         {
-            let w = win.clone();
+            let w = Rc::downgrade(win);
             win.window.connect_close_request(move |window| {
+                let Some(w) = w.upgrade() else {
+                    return gtk4::glib::Propagation::Proceed;
+                };
+
                 let (width, height) = (window.width(), window.height());
                 w.sync_ui_state_to_settings();
                 w.settings.borrow_mut().set_window_size(width, height);
@@ -191,16 +221,10 @@ mod tests {
         .expect("la config de test doit être écrite");
 
         SettingsManager::set_test_config_path(path);
-        let app = libadwaita::Application::builder()
-            .application_id(format!(
-                "io.github.tutoelectroweb.serialterm.signalstests{id}"
-            ))
-            .build();
-        app.register(gtk4::gio::Cancellable::NONE)
-            .expect("l'application GTK de test doit pouvoir s'enregistrer");
+        let app = crate::ui::window::shell::test_application();
 
-        let window =
-            MainWindow::new(&app).expect("la fenêtre principale doit pouvoir être construite");
+        let window = MainWindow::new_for_test(&app)
+            .expect("la fenêtre principale doit pouvoir être construite");
         SettingsManager::clear_test_config_path();
         window
     }
@@ -213,7 +237,7 @@ mod tests {
 
         *window.connection_tx.borrow_mut() = Some(tx);
 
-        window.window.close();
+        let _ = window.window.emit_by_name::<bool>("close-request", &[]);
         while glib::MainContext::default().iteration(false) {}
 
         assert!(window.connection_tx.borrow().is_none());

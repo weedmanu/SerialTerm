@@ -113,11 +113,14 @@ pub(super) fn queue_toast(
     message: &str,
     timeout: u32,
 ) {
-    let window = window.clone();
-    let overlay = overlay.clone();
+    let window = window.downgrade();
+    let overlay = overlay.downgrade();
     let message = message.to_string();
 
     glib::idle_add_local_once(move || {
+        let (Some(window), Some(overlay)) = (window.upgrade(), overlay.upgrade()) else {
+            return;
+        };
         if !window.is_visible() || !window.is_mapped() {
             log::debug!("Toast ignoré car la fenêtre n'est pas encore allouée: {message}");
             return;
@@ -472,8 +475,11 @@ impl MainWindow {
         self.show_bottom_notice(&notice);
         log::info!("Reconnexion automatique planifiée dans {delay_ms} ms (génération {gen}).");
 
-        let w = self.clone();
+        let w = Rc::downgrade(self);
         glib::timeout_add_local_once(Duration::from_millis(delay_ms), move || {
+            let Some(w) = w.upgrade() else {
+                return;
+            };
             if w.reconnect_generation.get() != gen {
                 log::debug!("Timer de connexion automatique annulé (génération obsolète).");
                 return;
@@ -563,14 +569,10 @@ mod tests {
         .expect("la config de test doit être écrite");
 
         SettingsManager::set_test_config_path(path);
-        let app = libadwaita::Application::builder()
-            .application_id(format!("io.github.tutoelectroweb.serialterm.tests{id}"))
-            .build();
-        app.register(gtk4::gio::Cancellable::NONE)
-            .expect("l'application GTK de test doit pouvoir s'enregistrer");
+        let app = crate::ui::window::shell::test_application();
 
-        let window =
-            MainWindow::new(&app).expect("la fenêtre principale doit pouvoir être construite");
+        let window = MainWindow::new_for_test(&app)
+            .expect("la fenêtre principale doit pouvoir être construite");
         SettingsManager::clear_test_config_path();
         window
     }

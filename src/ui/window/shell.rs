@@ -15,6 +15,25 @@ use crate::ui::input_panel::InputPanel;
 use crate::ui::terminal_panel::TerminalPanel;
 use crate::ui::theme::{Theme, ThemeManager};
 
+#[cfg(test)]
+thread_local! {
+    static TEST_APPLICATION: libadwaita::Application = {
+        use gtk4::gio::prelude::ApplicationExt;
+
+        let app = libadwaita::Application::builder()
+            .application_id("io.github.tutoelectroweb.serialterm.tests")
+            .build();
+        app.register(gtk4::gio::Cancellable::NONE)
+            .expect("l'application GTK de test doit pouvoir s'enregistrer");
+        app
+    };
+}
+
+#[cfg(test)]
+pub(super) fn test_application() -> libadwaita::Application {
+    TEST_APPLICATION.with(Clone::clone)
+}
+
 fn defer_terminal_welcome_until_mapped(
     window: &libadwaita::ApplicationWindow,
     notice_label: &Label,
@@ -55,11 +74,14 @@ pub(super) fn set_bottom_notice(
         return;
     };
 
-    let notice_label = notice_label.clone();
+    let notice_label = notice_label.downgrade();
     let notice_generation = notice_generation.clone();
     gtk4::glib::timeout_add_local(
         std::time::Duration::from_secs(u64::from(delay_secs)),
         move || {
+            let Some(notice_label) = notice_label.upgrade() else {
+                return gtk4::glib::ControlFlow::Break;
+            };
             if notice_generation.get() == next_generation {
                 notice_label.set_label("");
             }
@@ -106,6 +128,12 @@ pub struct MainWindow {
 }
 
 impl MainWindow {
+    #[cfg(test)]
+    fn restore_sidebar_visibility(&self, show_sidebar: bool) {
+        self.header.toggle_sidebar_button.set_active(show_sidebar);
+    }
+
+    #[cfg(not(test))]
     fn restore_sidebar_visibility(&self, show_sidebar: bool) {
         if !show_sidebar {
             self.header.toggle_sidebar_button.set_active(false);
@@ -215,6 +243,16 @@ impl MainWindow {
     /// sous-fonctions briserait les borrows des widgets partagés entre sections.
     #[allow(clippy::too_many_lines)]
     pub fn new(app: &libadwaita::Application) -> Option<Rc<Self>> {
+        Self::build(app, true)
+    }
+
+    #[cfg(test)]
+    pub(super) fn new_for_test(app: &libadwaita::Application) -> Option<Rc<Self>> {
+        Self::build(app, false)
+    }
+
+    #[allow(clippy::too_many_lines)]
+    fn build(app: &libadwaita::Application, present: bool) -> Option<Rc<Self>> {
         let settings = Rc::new(RefCell::new(SettingsManager::new()));
         let s = settings.borrow();
         let lang = UiLang::from_preference(&s.settings().ui.language);
@@ -510,7 +548,9 @@ impl MainWindow {
         // Connexion automatique au démarrage si l'option est activée.
         main_win.maybe_start_auto_connect();
 
-        main_win.window.present();
+        if present {
+            main_win.window.present();
+        }
         Some(main_win)
     }
 }
