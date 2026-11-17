@@ -101,18 +101,18 @@ impl UiLang {
         mode: crate::ui::terminal_panel::LogExportMode,
     ) -> &'static str {
         match (self, mode) {
-            (Self::Fr, crate::ui::terminal_panel::LogExportMode::Raw) => "✓ Flux brut sauvegardé :",
+            (Self::Fr, crate::ui::terminal_panel::LogExportMode::Raw) => "Flux brut sauvegardé :",
             (Self::Fr, crate::ui::terminal_panel::LogExportMode::Timestamped) => {
-                "✓ Flux horodaté sauvegardé :"
+                "Flux horodaté sauvegardé :"
             }
             (Self::Fr, crate::ui::terminal_panel::LogExportMode::Split) => {
-                "✓ Flux séparés sauvegardés :"
+                "Flux séparés sauvegardés :"
             }
-            (Self::En, crate::ui::terminal_panel::LogExportMode::Raw) => "✓ Raw stream saved:",
+            (Self::En, crate::ui::terminal_panel::LogExportMode::Raw) => "Raw stream saved:",
             (Self::En, crate::ui::terminal_panel::LogExportMode::Timestamped) => {
-                "✓ Timestamped stream saved:"
+                "Timestamped stream saved:"
             }
-            (Self::En, crate::ui::terminal_panel::LogExportMode::Split) => "✓ Split streams saved:",
+            (Self::En, crate::ui::terminal_panel::LogExportMode::Split) => "Split streams saved:",
         }
     }
 
@@ -154,8 +154,8 @@ impl UiLang {
     /// Placeholder de recherche dans les logs.
     pub const fn log_search_placeholder(self) -> &'static str {
         match self {
-            Self::Fr => "Rechercher dans les logs…",
-            Self::En => "Search in logs…",
+            Self::Fr => "Rechercher dans les logs...",
+            Self::En => "Search in logs...",
         }
     }
 
@@ -170,8 +170,8 @@ impl UiLang {
     /// Tooltip bouton exporter les logs.
     pub const fn log_export_tooltip(self) -> &'static str {
         match self {
-            Self::Fr => "Exporter les logs filtrés…",
-            Self::En => "Export filtered logs…",
+            Self::Fr => "Exporter les logs filtrés...",
+            Self::En => "Export filtered logs...",
         }
     }
 
@@ -259,9 +259,9 @@ impl UiLang {
     pub const fn log_status_hint(self) -> &'static str {
         match self {
             Self::Fr => {
-                "Clic : sélectionner  ·  Triple-clic : sélectionner tout le texte  ·  Ctrl+C : copier"
+                "Cliquez pour sélectionner. Trois clics sélectionnent tout le texte. Ctrl+C copie la sélection."
             }
-            Self::En => "Click: select  ·  Triple-click: select all text  ·  Ctrl+C: copy",
+            Self::En => "Click to select. Triple-click to select all text. Press Ctrl+C to copy.",
         }
     }
 
@@ -269,11 +269,19 @@ impl UiLang {
     pub fn log_count_label(self, visible: u32, total: usize, errors: u32, warnings: u32) -> String {
         match self {
             Self::Fr => format!(
-                "{visible} / {total} lignes  —  {errors} erreur(s)  ·  {warnings} avertissement(s)"
+                "{visible} lignes sur {total}. {errors} {} et {warnings} {}.",
+                if errors == 1 { "erreur" } else { "erreurs" },
+                if warnings == 1 {
+                    "avertissement"
+                } else {
+                    "avertissements"
+                }
             ),
-            Self::En => {
-                format!("{visible} / {total} lines  —  {errors} error(s)  ·  {warnings} warning(s)")
-            }
+            Self::En => format!(
+                "{visible} of {total} lines. {errors} {} and {warnings} {}.",
+                if errors == 1 { "error" } else { "errors" },
+                if warnings == 1 { "warning" } else { "warnings" }
+            ),
         }
     }
 

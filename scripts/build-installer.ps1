@@ -45,7 +45,7 @@ if (-not (Test-Path $buildExeScript)) {
 }
 
 if (-not $SkipBuild) {
-    Write-Host "🔨 Build de l'application (préparation distribution)..."
+    Write-Host " Build de l'application (préparation distribution)..."
     $buildArgs = @(
         "-ExecutionPolicy", "Bypass",
         "-File", $buildExeScript,
@@ -125,7 +125,7 @@ Filename: ""{app}\serial-term.exe""; Description: ""{cm:LaunchProgram,SerialTerm
 
 Set-Content -Path $setupScriptPath -Value $issContent -Encoding UTF8
 
-Write-Host "📦 Génération installateur avec Inno Setup..."
+Write-Host " Génération installateur avec Inno Setup..."
 & $isccPath $setupScriptPath
 if ($LASTEXITCODE -ne 0) {
     throw "Échec Inno Setup"
@@ -134,6 +134,6 @@ if ($LASTEXITCODE -ne 0) {
 $setupExe = Join-Path $installerDir "$outputBase.exe"
 
 Write-Host ""
-Write-Host "✓ Installateur généré" -ForegroundColor Green
+Write-Host "OK : Installateur généré" -ForegroundColor Green
 Write-Host "Script ISS : $setupScriptPath"
 Write-Host "Installateur : $setupExe"

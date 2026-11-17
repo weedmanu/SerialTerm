@@ -1,17 +1,7 @@
-# Scripts
+# Scripts du projet
 
-Ensemble de scripts utilitaires pour l'environnement de développement et le déploiement continu.
+Sous Linux, `install-deps.sh` installe les outils nécessaires et `install-hooks.sh` active les vérifications Git. `pre-commit-checks.sh` lance les contrôles de qualité. `build-deb.sh` construit le paquet Debian. `run-soak-test.sh` lance un essai prolongé de l'affichage.
 
-Fichiers bash (`.sh`) :
+Sous Windows, `install-deps-windows.ps1` prépare les outils et `pre-commit-checks-windows.ps1` lance les contrôles disponibles. `build-exe.ps1` prépare la version portable. `build-installer.ps1` construit l'installateur.
 
-- `install-deps.sh` : Résolution des dépendances systèmes pour Debian/Ubuntu.
-- `build-deb.sh` : Orchestrateur de compilation pour la création de l'installateur `.deb`.
-- `pre-commit-checks.sh` : Exécute la batterie de contrôles locale utilisée par le hook Git de pré-commit (`fmt`, `check`, `clippy`, `doc -D warnings`, `test`, `audit`, `deny`).
-- `run-soak-test.sh` : Lance l'application en mode soak test avec générateur de charge terminal intégré, diagnostics périodiques, durée bornable via environnement, fermeture automatique et capture des logs runtime. La qualification renforcée visée par le dépôt correspond à un run de 30 minutes en charge lourde, pas à plusieurs heures passives.
-
-Fichiers PowerShell (`.ps1`) :
-
-- `install-deps-windows.ps1` : Récupération automatique avec winget/MSYS2 des libs C/GTK dédiées à l'OS Windows.
-- `pre-commit-checks-windows.ps1` : Validation versionnée du bloc Windows (`fmt`, `check`, `clippy`, `doc -D warnings`, `test`, `audit`, `deny`, `machete`, build `x86_64-pc-windows-gnu`).
-- `build-exe.ps1` : Création de la version portable pour Windows (`.zip` et `.exe`).
-- `build-installer.ps1` : InnoSetup CLI runner pour le paquet setup d'installation global Windows.
+Les commandes et leurs prérequis sont décrits dans le [guide de développement](../DEVELOPMENT.md) et dans les [guides de création des paquets](../PACKAGING.md).

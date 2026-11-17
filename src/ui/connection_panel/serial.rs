@@ -5,7 +5,7 @@ use gtk4::{
     Box as GtkBox, Button, CheckButton, DropDown, Label, Orientation, SpinButton, StringList,
 };
 
-use crate::core::serial_manager::{list_serial_ports, BAUDRATE_FALLBACK};
+use crate::core::serial_manager::BAUDRATE_FALLBACK;
 use crate::ui::i18n::UiLang;
 
 use super::common::{
@@ -310,17 +310,8 @@ impl SerialPanel {
                 .set_tooltip_text(Some(lang.serial_port_tooltip()));
         }
 
-        panel.refresh_ports();
+        panel.update_ports_from_list(&[]);
         panel
-    }
-
-    /// Rafraîchit la liste des ports série disponibles (appel bloquant dans le thread courant).
-    ///
-    /// ⚠️  Préférer `refresh_ports_async` depuis un handler UI pour ne pas bloquer le thread GTK.
-    #[allow(clippy::as_conversions)]
-    pub fn refresh_ports(&self) {
-        let ports = list_serial_ports();
-        self.update_ports_from_list(&ports);
     }
 
     /// Met à jour l'info-bulle du port actuellement sélectionné.

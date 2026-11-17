@@ -65,11 +65,11 @@ if command -v cargo-machete >/dev/null 2>&1; then
 	non_vendor_findings=$(echo "$machete_out" | grep " -- " | grep -v "vendor/" || true)
 	if [ -n "$non_vendor_findings" ]; then
 		echo "$machete_out" >&2
-		echo "[pre-commit] cargo machete a détecté des dépendances inutilisées — corriger ou justifier." >&2
+		echo "[pre-commit] cargo machete a détecté des dépendances inutilisées : corriger ou justifier." >&2
 		exit 1
 	fi
 else
-	echo "[pre-commit] cargo-machete absent — skipped (installer via scripts/install-deps.sh)"
+	echo "[pre-commit] cargo-machete absent : skipped (installer via scripts/install-deps.sh)"
 fi
 
 echo "[pre-commit] OK"

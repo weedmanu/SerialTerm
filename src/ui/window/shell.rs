@@ -186,7 +186,6 @@ impl MainWindow {
             .serial_panel
             .set_auto_select_single_port(serial.auto_select_single_port);
 
-        self.connection_panel.serial_panel.refresh_ports();
         self.connection_panel
             .serial_panel
             .select_port_by_device(&serial.port);
@@ -544,9 +543,24 @@ impl MainWindow {
         Self::setup_actions(&main_win);
         main_win.restore_ui_from_settings();
         Self::setup_signals(&main_win);
+        if let Some(warning) = main_win.settings.borrow().load_warning() {
+            let dialog = libadwaita::AlertDialog::new(Some("Configuration"), Some(warning));
+            dialog.add_response("ok", "OK");
+            dialog.present(Some(&main_win.window));
+        }
 
         // Connexion automatique au démarrage si l'option est activée.
-        main_win.maybe_start_auto_connect();
+        if present {
+            let window = Rc::downgrade(&main_win);
+            gtk4::glib::spawn_future_local(async move {
+                if let Some(window) = window.upgrade() {
+                    window.refresh_serial_ports().await;
+                    if window.window.is_visible() {
+                        window.maybe_start_auto_connect();
+                    }
+                }
+            });
+        }
 
         if present {
             main_win.window.present();

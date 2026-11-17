@@ -24,11 +24,11 @@ install_cargo_tool() {
     local package="$2"
 
     if command -v "$binary" >/dev/null 2>&1; then
-        echo "   ✓ $binary est déjà installé"
+        echo "   OK : $binary est déjà installé"
     else
-        echo "   ↻ Installation de $package (--locked)"
+        echo "    Installation de $package (--locked)"
         if ! cargo install --locked "$package"; then
-            echo "   ⚠ Échec avec --locked, nouvelle tentative sans --locked"
+            echo "   Attention : Échec avec --locked, nouvelle tentative sans --locked"
             cargo install "$package"
         fi
     fi
@@ -36,14 +36,14 @@ install_cargo_tool() {
 
 install_rust_components() {
     if command -v rustup &> /dev/null; then
-        echo "   ↻ Installation des composants Rust requis..."
+        echo "    Installation des composants Rust requis..."
         rustup component add rustfmt clippy llvm-tools rust-src
     fi
 }
 
 install_cargo_validation_tools() {
     echo ""
-    echo "📦 Outils Cargo de validation..."
+    echo " Outils Cargo de validation..."
     install_cargo_tool cargo-audit cargo-audit
     install_cargo_tool cargo-deny cargo-deny
     install_cargo_tool cargo-nextest cargo-nextest
@@ -56,17 +56,17 @@ install_cargo_validation_tools() {
 verify_pkgconfig_gtk() {
     # Vérification rapide des .pc critiques utilisés pendant cargo check/clippy/test
     echo ""
-    echo "📦 Vérification pkg-config (GTK/GLib)..."
+    echo " Vérification pkg-config (GTK/GLib)..."
     pkg-config --exists gtk4 glib-2.0 gio-2.0 gobject-2.0 pango cairo gdk-pixbuf-2.0 graphene-gobject-1.0 || {
-        echo "✗ Des dépendances pkg-config GTK/GLib sont manquantes." >&2
+        echo "Erreur : Des dépendances pkg-config GTK/GLib sont manquantes." >&2
         echo "  Relancer ce script et vérifier les paquets dev installés ci-dessus." >&2
         exit 1
     }
 }
 
-echo "═══════════════════════════════════════════════════════════"
+echo "-----------------------------------------------------------"
 echo "  SerialTerm - Installation des dépendances"
-echo "═══════════════════════════════════════════════════════════"
+echo "-----------------------------------------------------------"
 echo ""
 
 # Détecter la distribution
@@ -75,7 +75,7 @@ if [ -f /etc/os-release ]; then
     DISTRO=$ID
     DISTRO_LIKE=${ID_LIKE:-}
 else
-    echo "✗ Impossible de détecter la distribution"
+    echo "Erreur : Impossible de détecter la distribution"
     exit 1
 fi
 
@@ -92,38 +92,38 @@ case "$DISTRO" in
         ;;
 esac
 
-echo "📦 Distribution détectée : $DISTRO"
+echo " Distribution détectée : $DISTRO"
 echo ""
 
 # Installer les dépendances selon la distribution
 case "$DISTRO" in
     ubuntu|debian)
-        echo "📥 Installation des dépendances pour Debian/Ubuntu..."
+        echo " Installation des dépendances pour Debian/Ubuntu..."
         echo ""
         
         # Mettre à jour les listes
-        echo "↻ Mise à jour des listes de paquets..."
+        echo " Mise à jour des listes de paquets..."
         sudo apt update
         
         # Build essentials + outils Debian packaging
         echo ""
-        echo "📦 Build essentials & packaging..."
+        echo " Build essentials & packaging..."
         sudo apt install -y build-essential debhelper devscripts lintian cargo
 
         # Dépendances système pour la compilation des outils Cargo (ex: cargo-outdated)
         echo ""
-        echo "📦 Toolchain système (OpenSSL/CMake)..."
+        echo " Toolchain système (OpenSSL/CMake)..."
         sudo apt install -y libssl-dev cmake
         
         # Rust (si pas présent)
         echo ""
-        echo "📦 Vérification de Rust..."
+        echo " Vérification de Rust..."
         if ! command -v cargo &> /dev/null; then
             echo "   Rust n'est pas installé. Installation de rustup..."
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
             source "$HOME/.cargo/env"
         else
-            echo "   ✓ Rust est déjà installé"
+            echo "   OK : Rust est déjà installé"
         fi
 
         install_rust_components
@@ -131,7 +131,7 @@ case "$DISTRO" in
         # Dépendances GTK4/Libadwaita + libs de dev explicites
         # (évite les régressions si des dépendances transitives changent)
         echo ""
-        echo "📦 Dépendances GTK4..."
+        echo " Dépendances GTK4..."
         sudo apt install -y \
             libgtk-4-dev \
             libadwaita-1-dev \
@@ -144,7 +144,7 @@ case "$DISTRO" in
 
         # Outils de build
         echo ""
-        echo "📦 Outils..."
+        echo " Outils..."
         sudo apt install -y pkgconf libudev-dev xvfb
 
         install_cargo_validation_tools
@@ -152,13 +152,13 @@ case "$DISTRO" in
         
         ;;
     fedora)
-        echo "📥 Installation des dépendances pour Fedora..."
+        echo " Installation des dépendances pour Fedora..."
         echo ""
         
-        echo "↻ Mise à jour..."
+        echo " Mise à jour..."
         sudo dnf upgrade -y
         
-        echo "📦 Build essentials..."
+        echo " Build essentials..."
         sudo dnf groupinstall -y "Development Tools"
         sudo dnf install -y rpm-build openssl-devel cmake
         
@@ -169,10 +169,10 @@ case "$DISTRO" in
         fi
         install_rust_components
         
-        echo "📦 Dépendances GTK4..."
+        echo " Dépendances GTK4..."
         sudo dnf install -y gtk4-devel libadwaita-devel
         
-        echo "📦 Outils..."
+        echo " Outils..."
         sudo dnf install -y pkg-config xorg-x11-server-Xvfb
 
         install_cargo_validation_tools
@@ -180,10 +180,10 @@ case "$DISTRO" in
         
         ;;
     arch)
-        echo "📥 Installation des dépendances pour Arch..."
+        echo " Installation des dépendances pour Arch..."
         echo ""
         
-        echo "📦 Build essentials..."
+        echo " Build essentials..."
         sudo pacman -Sy --noconfirm base-devel openssl cmake
         
         if ! command -v cargo &> /dev/null; then
@@ -193,10 +193,10 @@ case "$DISTRO" in
         fi
         install_rust_components
         
-        echo "📦 Dépendances GTK4..."
+        echo " Dépendances GTK4..."
         sudo pacman -Sy --noconfirm gtk4 libadwaita
         
-        echo "📦 Outils..."
+        echo " Outils..."
         sudo pacman -Sy --noconfirm pkg-config xorg-server-xvfb
 
         install_cargo_validation_tools
@@ -204,7 +204,7 @@ case "$DISTRO" in
         
         ;;
     *)
-        echo "⚠ Distribution non reconnue : $DISTRO"
+        echo "Attention : Distribution non reconnue : $DISTRO"
         echo ""
         echo "Installation manuelle requise. Installez :"
         echo "  - build-essential ou equivalent"
@@ -222,13 +222,13 @@ esac
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 if [ -x "${SCRIPT_DIR}/install-hooks.sh" ] && [ -d "${SCRIPT_DIR}/../.git" ]; then
     echo ""
-    echo "📦 Activation des hooks Git versionnés..."
-    "${SCRIPT_DIR}/install-hooks.sh" || echo "⚠ Activation des hooks ignorée (à exécuter manuellement : ./scripts/install-hooks.sh)"
+    echo " Activation des hooks Git versionnés..."
+    "${SCRIPT_DIR}/install-hooks.sh" || echo "Attention : Activation des hooks ignorée (à exécuter manuellement : ./scripts/install-hooks.sh)"
 fi
 
 echo ""
-echo "═══════════════════════════════════════════════════════════"
-echo "✓ Toutes les dépendances sont installées !"
+echo "-----------------------------------------------------------"
+echo "OK : Toutes les dépendances sont installées !"
 echo ""
 echo "Étapes suivantes :"
 echo "  1. cd $(dirname "$0")/.."
@@ -240,4 +240,4 @@ echo "Pour créer un paquet .deb :"
 echo "  ./scripts/build-deb.sh"
 echo "Pour lancer la batterie pré-commit :"
 echo "  bash scripts/pre-commit-checks.sh"
-echo "═══════════════════════════════════════════════════════════"
+echo "-----------------------------------------------------------"

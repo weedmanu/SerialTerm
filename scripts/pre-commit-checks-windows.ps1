@@ -76,7 +76,7 @@ if (Get-Command cargo-machete -ErrorAction SilentlyContinue) {
         }
     }
 } else {
-    Write-Host "[pre-commit-windows] cargo-machete absent — skipped (relancer scripts/install-deps-windows.ps1)"
+    Write-Host "[pre-commit-windows] cargo-machete absent : skipped (relancer scripts/install-deps-windows.ps1)"
 }
 
 Write-Host "[pre-commit-windows] cargo build --release --target $targetTriple"

@@ -127,18 +127,16 @@ impl UiLang {
     /// Libellé du timeout d'I/O série en millisecondes.
     pub const fn serial_timeout_label(self) -> &'static str {
         match self {
-            Self::Fr => "Timeout I/O (ms) :",
-            Self::En => "Serial I/O timeout (ms):",
+            Self::Fr => "Délai d’envoi (ms) :",
+            Self::En => "Send timeout (ms):",
         }
     }
 
     /// Tooltip du timeout d'I/O série.
     pub const fn serial_timeout_tooltip(self) -> &'static str {
         match self {
-            Self::Fr => {
-                "Délai maximal d'attente sur lecture/écriture série avant retour de contrôle."
-            }
-            Self::En => "Maximum time to wait on serial read/write before returning control.",
+            Self::Fr => "Délai maximal d'envoi, incluant l'attente du tampon de sortie série.",
+            Self::En => "Maximum send time, including waiting for the serial output buffer.",
         }
     }
 
@@ -239,16 +237,16 @@ impl UiLang {
     /// Texte affiché quand aucun port série n'est disponible.
     pub const fn serial_no_port(self) -> &'static str {
         match self {
-            Self::Fr => "— Brancher un périphérique série —",
-            Self::En => "— Connect a serial device —",
+            Self::Fr => "Brancher un périphérique série",
+            Self::En => "Connect a serial device",
         }
     }
 
     /// Tooltip affiché sur le dropdown quand aucun port n'est détecté.
     pub const fn serial_no_port_tooltip(self) -> &'static str {
         match self {
-            Self::Fr => "Aucun port série détecté.\nBranchez un adaptateur USB-série ou une carte de développement,\npuis cliquez sur ↺ pour rafraîchir la liste.",
-            Self::En => "No serial port detected.\nPlug in a USB-to-serial adapter or a development board,\nthen click ↺ to refresh the list.",
+            Self::Fr => "Aucun port série détecté.\nBranchez un adaptateur USB-série ou une carte de développement,\npuis utilisez le bouton de rafraîchissement pour rafraîchir la liste.",
+            Self::En => "No serial port detected.\nPlug in a USB-to-serial adapter or a development board,\nthen use the refresh button to refresh the list.",
         }
     }
 

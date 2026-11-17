@@ -56,6 +56,8 @@ pub enum ConnectionEvent {
     },
     /// Données reçues du périphérique distant.
     DataReceived(Vec<u8>),
+    /// Écriture complète confirmée par le pilote série.
+    DataSent(Vec<u8>),
     /// Connexion fermée proprement.
     Disconnected,
     /// Erreur non-récupérable (affichée dans le terminal).
@@ -176,6 +178,10 @@ pub fn spawn_connection_actor(
                                 let _ = event_tx.send(ConnectionEvent::Error(e.to_string())).await;
                                 break;
                             }
+                            if event_tx.send(ConnectionEvent::DataSent(data)).await.is_err() {
+                                let _ = connection.disconnect().await;
+                                break;
+                            }
                         }
                         Some(ConnectionCommand::ResizeTerminal {
                             columns,
@@ -232,7 +238,7 @@ pub fn spawn_connection_actor(
         }
 
         log::info!(
-            "Connexion terminée — envoyés: {} octets, reçus: {} octets",
+            "Connexion terminée. Octets envoyés : {}, octets reçus : {}",
             connection.bytes_sent(),
             connection.bytes_received()
         );
@@ -550,6 +556,10 @@ mod tests {
             .await
             .expect("disconnect command should be sent");
 
+        match recv_event(&event_rx).await {
+            ConnectionEvent::DataSent(data) => assert_eq!(data, b"hello"),
+            other => panic!("unexpected event: {other:?}"),
+        }
         assert!(matches!(
             recv_event(&event_rx).await,
             ConnectionEvent::Disconnected

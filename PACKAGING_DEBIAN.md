@@ -2,39 +2,27 @@
 
 Guide de production du paquet `.deb` pour SerialTerm.
 
-Référence : [PACKAGING.md](PACKAGING.md) (index général) · [DEVELOPMENT.md](DEVELOPMENT.md) (validation développeur)
+Consultez également [PACKAGING.md](PACKAGING.md) et [DEVELOPMENT.md](DEVELOPMENT.md).
 
-## Structure des fichiers Debian
+## Fichiers du paquet
 
-```
-debian/
-├── control                      # Métadonnées du paquet
-├── rules                        # Règles de build (exécutable)
-├── changelog                    # Historique des versions
-├── copyright                    # Licence (format DEP-5)
-├── serial-term.1                # Page de manuel utilisateur
-├── serial-term.manpages         # Déclaration d'installation de la page man
-├── source/format                # Format source (3.0 native)
-└── serial-term.desktop      # Entrée FDO Desktop (bilingue FR/EN)
-```
+`debian/control` déclare les dépendances. `debian/rules` construit et installe le programme. Les autres fichiers fournissent l'historique des versions, la licence, la page de manuel et le lanceur de bureau.
 
 ## Prérequis
 
 ```bash
-./scripts/install-deps.sh   # Installe build-essential, debhelper, devscripts, Rust, GTK4…
+./scripts/install-deps.sh   # Installe build-essential, debhelper, devscripts, Rust, GTK 4
 ```
 
-## Build du .deb
+## Construire le paquet
 
 ```bash
 bash scripts/build-deb.sh
 ```
 
-Le script exécute `cargo build --release` puis appelle `debuild` qui:
-- invoque `debian/rules`,
-- génère `serial-term_<version>_amd64.deb`.
+Le script exécute `cargo build --release`, puis appelle `debuild`. Ce dernier utilise `debian/rules` pour produire `serial-term_<version>_amd64.deb`.
 
-Les artefacts sont déposés dans `dist/debian/`.
+Le paquet est placé dans `dist/debian/`.
 
 ## Installation locale
 
@@ -48,8 +36,8 @@ sudo dpkg -i dist/debian/serial-term_*.deb
 
 Métadonnées du paquet :
 - `Package` : `serial-term`
-- `Architecture` : `amd64` (cross-architecture possible via `rustup target add`)
-- `Depends` : `libc6 (≥ 2.31)`, `libgtk-4-1 (≥ 4.0)`, `libadwaita-1 (≥ 0.7)`
+- `Architecture` : `amd64`
+- `Depends` : générées à partir des bibliothèques liées, avec les dépendances Debian requises
 - `Maintainer` : Manu
 - `Build-Depends` : inclut `debhelper-compat (= 13)`.
 
@@ -83,7 +71,7 @@ Page de manuel installée avec le paquet pour documenter la commande `serial-ter
 
 ### debian/serial-term.desktop
 
-Entrée FDO bilingue FR/EN. Champs clés :
+Entrée FDO bilingue FR/EN. Champs principaux :
 - `Exec` / `TryExec` : binaire `serial-term`
 - `StartupWMClass` : `io.github.TutoElectroWeb.SerialTerm`
 - `Categories` : `System;TerminalEmulator;GTK;`
@@ -96,13 +84,13 @@ Le workflow [`.github/workflows/package-deb.yml`](.github/workflows/package-deb.
 
 | Outil | Rôle |
 |-------|------|
-| `rustc` + `cargo` ≥ 1.75 | Compilateur |
-| `libgtk-4-dev`, `libadwaita-1-dev` | Headers GTK4/Libadwaita |
-| `libudev-dev` | Headers udev |
+| `rustc` + `cargo` ≥ 1.85 | Compilateur |
+| `libgtk-4-dev`, `libadwaita-1-dev` | Fichiers de développement GTK 4 et Libadwaita |
+| `libudev-dev` | Fichiers de développement udev |
 | `debhelper`, `devscripts`, `fakeroot` | Outils Debian |
-| `pkgconf`, `cmake`, `clang` | Build helpers |
+| `pkgconf`, `cmake`, `clang` | Outils de compilation |
 
-## Troubleshooting
+## Dépannage
 
 ### `debuild: command not found`
 
@@ -122,20 +110,15 @@ sudo apt install devscripts
 dpkg -I dist/debian/serial-term_*.deb | grep Depends
 ```
 
-### Lint Lintian
+### Vérifier avec Lintian
 
 ```bash
 lintian dist/debian/serial-term_*.deb
 ```
 
-## Cross-compilation
+## Autres architectures
 
-```bash
-rustup target add aarch64-unknown-linux-gnu
-cargo build --target aarch64-unknown-linux-gnu --release
-```
-
-Adapter ensuite `debian/rules` et `debian/control` (champ `Architecture`).
+Le paquet est actuellement déclaré pour `amd64` dans `debian/control`. Une version `arm64` nécessiterait une chaîne de compilation, des bibliothèques GTK et udev pour cette architecture, ainsi qu'une validation du paquet sur une machine adaptée. Ajouter la cible Rust ne suffit pas à produire un paquet Debian vérifié.
 
 ## Nouvelle version
 

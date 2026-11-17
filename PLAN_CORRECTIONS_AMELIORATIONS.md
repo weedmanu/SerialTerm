@@ -7,7 +7,7 @@ Cette feuille de route priorise les travaux nécessaires pour rendre SerialTerm 
 - [ ] Vérifier que les forks `vendor/serialport` et `vendor/unescaper` sont présents dans chaque archive source publiée.
 - [ ] Documenter les correctifs portés par ces forks et leurs critères de retour aux versions crates.io.
 - [ ] Vérifier que `assets/icon.svg`, les scripts de construction et les workflows CI restent dans les branches servant aux publications.
-- [ ] Ajouter `libudev-dev` aux dépendances de construction Debian.
+- [x] Ajouter `libudev-dev` aux dépendances de construction Debian.
 - [ ] Remplacer `Architecture: amd64` par `Architecture: any`, puis valider amd64 et arm64.
 - [ ] Construire les paquets uniquement depuis un tag Git afin de relier chaque binaire à ses sources.
 
@@ -23,12 +23,12 @@ dpkg-buildpackage -us -uc
 
 ## P1 - Fiabiliser les communications et les données
 
-- [ ] Remplacer l'écriture série partielle par `write_all`.
-- [ ] Émettre un accusé d'envoi depuis l'acteur avant de mettre à jour TX et l'écho local.
+- [x] Remplacer l'écriture série partielle par `write_all`.
+- [x] Émettre un accusé d'envoi depuis l'acteur avant de mettre à jour TX et l'écho local.
 - [ ] Tester les écritures partielles, la saturation du canal et la déconnexion pendant un envoi.
-- [ ] Sauvegarder les paramètres dans un fichier temporaire puis effectuer un renommage atomique.
-- [ ] Conserver en `.bak` une configuration JSON invalide et prévenir l'utilisateur.
-- [ ] Déplacer toutes les énumérations de ports hors du thread GTK, y compris au démarrage et pendant la reconnexion.
+- [x] Sauvegarder les paramètres dans un fichier temporaire puis effectuer un renommage atomique.
+- [x] Conserver en `.bak` une configuration JSON invalide et prévenir l'utilisateur.
+- [x] Déplacer toutes les énumérations de ports hors du thread GTK, y compris au démarrage et pendant la reconnexion.
 
 Critères de validation : aucune troncature sous charge, interface réactive pendant l'énumération et récupération possible après interruption d'une sauvegarde.
 
@@ -49,7 +49,7 @@ Critères de validation : les fonctionnalités annoncées dans les README corres
 - [ ] Afficher le débit RX/TX instantané, la durée de session et le nombre d'erreurs.
 - [ ] Tester la reconnexion avec changement de nom `/dev/ttyUSBx` et alias stable `by-id`.
 - [ ] Ajouter un test prolongé du scrollback et du parseur ANSI avec mesure mémoire.
-- [ ] Exécuter `cargo audit` et `cargo deny` en CI.
+- [x] Exécuter `cargo audit` et `cargo deny` en CI.
 - [ ] Archiver le rapport CI et les sommes SHA-256 pour chaque version.
 
 Critères de validation : rapport CI disponible pour chaque version et paquet reconstruisible depuis le tag correspondant.

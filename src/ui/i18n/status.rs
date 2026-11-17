@@ -14,7 +14,7 @@ impl UiLang {
         }
     }
 
-    /// Retourne le texte de statut "Connexion en cours…".
+    /// Retourne le texte de statut "Connexion en cours...".
     pub const fn status_connecting(self) -> &'static str {
         match self {
             Self::Fr => "Connexion en cours...",
@@ -164,8 +164,8 @@ impl UiLang {
     /// Erreur non connecté.
     pub const fn not_connected_error(self) -> &'static str {
         match self {
-            Self::Fr => "Non connecté — impossible d'envoyer.",
-            Self::En => "Not connected — cannot send.",
+            Self::Fr => "Envoi impossible : aucun port connecté.",
+            Self::En => "Cannot send: no port is connected.",
         }
     }
 
@@ -216,8 +216,8 @@ impl UiLang {
     /// Placeholder de la barre de recherche dans le terminal.
     pub const fn search_terminal_placeholder(self) -> &'static str {
         match self {
-            Self::Fr => "Rechercher dans le terminal…",
-            Self::En => "Search in terminal…",
+            Self::Fr => "Rechercher dans le terminal...",
+            Self::En => "Search in terminal...",
         }
     }
 

@@ -1,35 +1,12 @@
-# Preuves et audits
+# Rapports de vérification
 
-Ce dossier contient des jeux de preuves datés.
+Le dossier `raw/` conserve des journaux et des codes de sortie de contrôles antérieurs. Certains journaux de cette période ne sont plus présents. Les fichiers `.exit` seuls indiquent un résultat, sans donner le détail de l'exécution.
 
-Chaque jeu regroupe :
+Les journaux encore disponibles concernent le formatage, la compilation, Clippy et l'audit des dépendances :
 
-- un résumé lisible ;
-- un index des fichiers bruts ;
-- les journaux bruts dans `proofs/raw/` ;
-- les empreintes SHA256 associées.
+- [Formatage](raw/cargo_fmt_check.log)
+- [Compilation](raw/cargo_check.log)
+- [Clippy](raw/cargo_clippy_strict.log)
+- [Audit des dépendances](raw/cargo_audit.log)
 
-Les anciens résumés datés et index associés ont été retirés du dépôt. Les journaux bruts de référence restent conservés dans `proofs/raw/`.
-
-Fichiers bruts actuels de référence :
-
-- [proofs/raw/cargo_fmt_check.log](raw/cargo_fmt_check.log)
-- [proofs/raw/cargo_check.log](raw/cargo_check.log)
-- [proofs/raw/cargo_test_all_targets.log](raw/cargo_test_all_targets.log)
-- [proofs/raw/cargo_clippy_strict.log](raw/cargo_clippy_strict.log)
-- [proofs/raw/cargo_audit.log](raw/cargo_audit.log)
-- [proofs/raw/cargo_deny_check.log](raw/cargo_deny_check.log)
-- [proofs/raw/cargo_tree_duplicates.log](raw/cargo_tree_duplicates.log)
-- [proofs/raw/cargo_llvm_cov_summary.log](raw/cargo_llvm_cov_summary.log)
-- [proofs/raw/soak_2026-03-24.log](raw/soak_2026-03-24.log)
-- [proofs/raw/SHA256SUMS_2026-03-24.txt](raw/SHA256SUMS_2026-03-24.txt)
-
-Lecture recommandée :
-
-1. lire ce fichier de synthèse ;
-2. ouvrir ensuite les journaux bruts utiles dans `proofs/raw/` ;
-3. vérifier enfin les empreintes SHA256 associées.
-
-Le dernier lot publié avant nettoyage des archives documentait `121` tests, un durcissement testé du hot-unplug série Linux, un assainissement Debian/MATE du thème GTK `Yaru-MATE-*`, un soak qualifié de 30 minutes en charge lourde sans warning GTK/Adwaita visible, ainsi que les duplications transitives encore ouvertes à cette date.
-
-La préparation v1.0.0 du dépôt conserve un périmètre strictement série. Les nouveaux lots de preuves doivent se concentrer sur la robustesse du panneau série (timeout I/O persisté, alias stables `/dev/serial/by-id/...`, hot-unplug, reconnexion automatique), la stabilité GTK headless, le packaging Debian et la cohérence des métadonnées de publication.
+Les [sommes SHA-256 du 24 mars 2026](raw/SHA256SUMS_2026-03-24.txt) se rapportent à l'ancien lot de fichiers. Pour valider le code actuel, exécutez les commandes du [guide de développement](../DEVELOPMENT.md).

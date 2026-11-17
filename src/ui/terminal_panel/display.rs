@@ -601,6 +601,14 @@ impl TerminalPanel {
     fn maybe_trim_scrollback(&self) {
         const TRIM_EVERY: u32 = 32; // déclenche le trim 1 fois sur 32 insertions
 
+        // Plafond indépendant des retours à la ligne (au plus 4 Mio UTF-8).
+        const MAX_CHARS: i32 = 1_048_576;
+        let excess = self.buffer.char_count().saturating_sub(MAX_CHARS);
+        if excess > 0 {
+            let mut start = self.buffer.start_iter();
+            let mut end = self.buffer.iter_at_offset(excess);
+            self.buffer.delete(&mut start, &mut end);
+        }
         let c = self.trim_counter.get().wrapping_add(1); // incrément avec wrap-around à 0 (pas de panique à u32::MAX)
         self.trim_counter.set(c);
 
@@ -683,6 +691,8 @@ impl TerminalPanel {
         self.buffer
             .delete(&mut self.buffer.start_iter(), &mut self.buffer.end_iter());
         self.timestamped_log.borrow_mut().clear();
+        self.reset_ansi_state();
+        self.trim_counter.set(0);
         // suppression [début, fin[
     }
 
@@ -729,6 +739,43 @@ impl TerminalPanel {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[gtk4::test]
+    fn clear_starts_a_clean_session_including_partial_ansi_and_exports() {
+        let terminal = TerminalPanel::new(256, UiLang::Fr);
+        terminal.append_ansi(b"ancien\r\x1b[38;2;255;0;0mrouge\x1b[");
+        terminal.append_sent("commande ancienne\n");
+        terminal.clear();
+        assert_eq!(terminal.get_text(), "");
+        assert_eq!(terminal.export_text(LogExportMode::Raw), "");
+        terminal.append_ansi(b"nouveau\n");
+        assert_eq!(terminal.get_text(), "nouveau\n");
+        assert_eq!(terminal.export_text(LogExportMode::Raw), "nouveau\n");
+        terminal.append_ansi(b"\r");
+        terminal.clear();
+        terminal.append_ansi(b"\nOK");
+        assert_eq!(terminal.get_text(), "\nOK");
+    }
+
+    #[gtk4::test]
+    fn terminal_limits_text_without_newlines_and_rgb_tags() {
+        let terminal = TerminalPanel::new(256, UiLang::Fr);
+        let chunk = vec![b'x'; 4096];
+        for _ in 0..260 {
+            terminal.append_ansi(&chunk);
+        }
+        assert!(terminal.buffer.char_count() <= 1_048_576);
+        terminal.clear();
+        let initial_tags = terminal.buffer.tag_table().size();
+        for color in 0_u32..1100 {
+            let red = color / 256;
+            let green = color % 256;
+            terminal.append_ansi(format!("\x1b[38;2;{red};{green};1mx").as_bytes());
+        }
+        assert!(terminal.buffer.tag_table().size() <= initial_tags.saturating_add(1024));
+        terminal.clear();
+        assert_eq!(terminal.buffer.tag_table().size(), initial_tags);
+    }
 
     #[gtk4::test]
     fn append_error_formats_terminal_message_with_error_prefix() {

@@ -30,7 +30,7 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectRoot = Split-Path -Parent $scriptDir
 Set-Location $projectRoot
 
-Write-Host "🔨 Compilation Rust ($Configuration, cible $targetTriple)..."
+Write-Host " Compilation Rust ($Configuration, cible $targetTriple)..."
 if ($Configuration -eq "release") {
     cargo build --release --target $targetTriple
     $exePath = Join-Path $projectRoot "target\$targetTriple\release\serial-term.exe"
@@ -67,7 +67,7 @@ if ($IncludeGtkRuntime) {
         throw "GTK runtime introuvable ($gtkBin). Installez MSYS2 et les paquets mingw64 requis."
     }
 
-    Write-Host "📦 Copie runtime GTK depuis $gtkBin..."
+    Write-Host " Copie runtime GTK depuis $gtkBin..."
     Get-ChildItem $gtkBin -Filter "*.dll" | ForEach-Object {
         Copy-Item $_.FullName (Join-Path $appFolder $_.Name) -Force
     }
@@ -79,11 +79,11 @@ if (Test-Path $archivePath) {
     Remove-Item $archivePath -Force
 }
 
-Write-Host "🗜️ Création archive $archiveName..."
+Write-Host "️ Création archive $archiveName..."
 Compress-Archive -Path (Join-Path $appFolder "*") -DestinationPath $archivePath -CompressionLevel Optimal
 
 Write-Host ""
-Write-Host "✓ Build terminé" -ForegroundColor Green
+Write-Host "OK : Build terminé" -ForegroundColor Green
 Write-Host "EXE : $exePath"
 Write-Host "Dossier distrib : $appFolder"
 Write-Host "Archive : $archivePath"

@@ -2,7 +2,7 @@ Source: serial-term
 Section: utils
 Priority: optional
 Maintainer: Manu <terraspi13@gmail.com>
-Build-Depends: debhelper-compat (= 13), cargo, libgtk-4-dev, libadwaita-1-dev, pkgconf
+Build-Depends: debhelper-compat (= 13), cargo, libudev-dev, libgtk-4-dev, libadwaita-1-dev, pkgconf
 Standards-Version: 4.6.0
 Homepage: https://github.com/weedmanu/SerialTerm
 
@@ -15,6 +15,6 @@ Description: Terminal graphique pour connexions série
  .
  Fonctionnalités principales :
  .
- Connexion série configurable, émulation terminal ANSI, affichage en
- temps réel avec scrollback, outils intégrés, sauvegarde des logs,
+ Connexion série configurable, affichage de séquences ANSI courantes
+ avec historique limité, outils intégrés, export des échanges,
  thèmes et configuration persistante en JSON.

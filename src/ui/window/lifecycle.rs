@@ -133,6 +133,33 @@ pub(super) fn queue_toast(
 }
 
 impl MainWindow {
+    /// L'énumération peut attendre le système : toujours hors du thread GTK.
+    #[allow(clippy::future_not_send)] // Future locale GTK, exécutée par GLib.
+    pub(super) async fn refresh_serial_ports(&self) {
+        let preferred = self
+            .connection_panel
+            .serial_panel
+            .effective_port()
+            .unwrap_or_else(|| self.settings.borrow().settings().serial.port.clone());
+        match self
+            .runtime
+            .spawn_blocking(crate::core::serial_manager::list_serial_ports)
+            .await
+        {
+            Ok(ports) => {
+                self.connection_panel
+                    .serial_panel
+                    .update_ports_from_list(&ports);
+                if !preferred.is_empty() {
+                    self.connection_panel
+                        .serial_panel
+                        .select_port_by_device(&preferred);
+                }
+            }
+            Err(error) => log::warn!("Énumération des ports interrompue : {error}"),
+        }
+    }
+
     fn handle_connection_event(
         self: &Rc<Self>,
         event: Result<ConnectionEvent, async_channel::RecvError>,
@@ -155,13 +182,13 @@ impl MainWindow {
                     .map_or_else(
                         || {
                             format!(
-                                "{} {type_label} — {baudrate} {baud_unit}",
+                                "{} {type_label} : {baudrate} {baud_unit}",
                                 self.lang.connected_system()
                             )
                         },
                         |device| {
                             format!(
-                                "{} {type_label} — {device} @ {baudrate} {baud_unit}",
+                                "{} {type_label} : {device}, {baudrate} {baud_unit}",
                                 self.lang.connected_system()
                             )
                         },
@@ -171,6 +198,20 @@ impl MainWindow {
                 self.show_bottom_notice(&connected_status);
                 self.input.grab_focus();
                 self.sync_terminal_size();
+                true
+            }
+            Ok(ConnectionEvent::DataSent(data)) => {
+                self.tx_bytes.set(
+                    self.tx_bytes
+                        .get()
+                        .saturating_add(u64::try_from(data.len()).unwrap_or(0)),
+                );
+                self.update_stats();
+                let payload = String::from_utf8_lossy(&data);
+                self.terminal.append_sent(&format!(
+                    "TX : {}\n",
+                    payload.trim_end_matches(['\r', '\n'])
+                ));
                 true
             }
             Ok(ConnectionEvent::DataReceived(data)) => {
@@ -290,7 +331,7 @@ impl MainWindow {
             Err(e) => {
                 self.set_status(self.lang.configuration_error(), false);
                 self.terminal.append_error(&e);
-                self.show_toast(&format!("⚠ {e}"));
+                self.show_toast(&e);
                 log::error!("Erreur de configuration : {e}");
                 return;
             }
@@ -299,7 +340,10 @@ impl MainWindow {
         self.set_status(self.lang.status_connecting(), false);
         self.show_bottom_notice(self.lang.status_connecting());
 
-        self.terminal.reset_ansi_state();
+        self.terminal.clear();
+        self.rx_bytes.set(0);
+        self.tx_bytes.set(0);
+        self.update_stats();
 
         let guard = self.runtime.enter();
         let (cmd_tx, event_rx) = spawn_connection_actor(manager);
@@ -427,7 +471,7 @@ impl MainWindow {
         let rx = self.rx_bytes.get();
         let tx = self.tx_bytes.get();
         self.io_bytes_label.set_label(&format!(
-            "RX {} · TX {}",
+            "RX : {} ; TX : {}",
             format_bytes(rx),
             format_bytes(tx)
         ));
@@ -489,18 +533,22 @@ impl MainWindow {
                 return;
             }
 
-            w.connection_panel.serial_panel.refresh_ports();
+            glib::spawn_future_local(async move {
+                w.refresh_serial_ports().await;
+                if w.reconnect_generation.get() != gen || w.connection_tx.borrow().is_some() {
+                    return;
+                }
+                if w.connection_panel.serial_panel.effective_port().is_none() {
+                    log::info!("Port non disponible, nouvelle tentative automatique planifiée.");
+                    w.show_bottom_notice(w.lang.auto_reconnect_port_unavailable_notice());
+                    w.schedule_auto_reconnect();
+                    return;
+                }
 
-            if w.connection_panel.serial_panel.effective_port().is_none() {
-                log::info!("Port non disponible, nouvelle tentative automatique planifiée.");
-                w.show_bottom_notice(w.lang.auto_reconnect_port_unavailable_notice());
-                w.schedule_auto_reconnect();
-                return;
-            }
-
-            log::info!("Tentative de connexion automatique...");
-            w.show_bottom_notice(w.lang.auto_reconnect_attempt_notice());
-            w.connect();
+                log::info!("Tentative de connexion automatique...");
+                w.show_bottom_notice(w.lang.auto_reconnect_attempt_notice());
+                w.connect();
+            });
         });
     }
 
@@ -575,6 +623,59 @@ mod tests {
             .expect("la fenêtre principale doit pouvoir être construite");
         SettingsManager::clear_test_config_path();
         window
+    }
+
+    #[gtk4::test]
+    fn tx_is_only_displayed_after_confirmation_and_full_queue_keeps_input() {
+        let window = build_window_for_tests();
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+        *window.connection_tx.borrow_mut() = Some(tx);
+        window.input.entry.set_text("AT");
+        window.send_data();
+        assert_eq!(window.tx_bytes.get(), 0);
+        assert_eq!(window.terminal.get_text(), "");
+        window.input.entry.set_text("second");
+        window.send_data();
+        assert_eq!(window.input.get_text(), "second");
+        assert_eq!(window.tx_bytes.get(), 0);
+        assert!(matches!(rx.try_recv(), Ok(ConnectionCommand::SendData(_))));
+        window.handle_connection_event(Ok(ConnectionEvent::DataSent(b"AT\n".to_vec())));
+        assert_eq!(window.tx_bytes.get(), 3);
+        assert!(window.terminal.get_text().contains("TX : AT\n"));
+        window.disconnect();
+        close_window_for_tests(&window);
+    }
+
+    #[gtk4::test]
+    fn connecting_clears_previous_display_exports_and_counters() {
+        let window = build_window_for_tests();
+        window
+            .connection_panel
+            .serial_panel
+            .update_ports_from_list(&[crate::core::serial_manager::SerialPortInfo {
+                device: "/dev/serial-term-test-nonexistent".into(),
+                manufacturer: String::new(),
+                description: String::new(),
+                friendly_name: "test".into(),
+                stable_path: String::new(),
+            }]);
+        window.terminal.append_ansi(b"ancienne session\r\x1b[");
+        window.rx_bytes.set(123);
+        window.tx_bytes.set(456);
+        window.connect();
+        assert_eq!(window.terminal.get_text(), "");
+        assert_eq!(
+            window
+                .terminal
+                .export_text(crate::ui::terminal_panel::LogExportMode::Raw),
+            ""
+        );
+        assert_eq!(window.rx_bytes.get(), 0);
+        assert_eq!(window.tx_bytes.get(), 0);
+        // Invalider l'événement d'échec d'ouverture encore en attente.
+        window.disconnect();
+        close_window_for_tests(&window);
+        assert_eq!(window.terminal.get_text(), "");
     }
 
     #[gtk4::test]

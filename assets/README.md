@@ -1,6 +1,3 @@
-# Assets
+# Ressources graphiques
 
-Ce répertoire centralise les actifs statiques du projet SerialTerm.
-
-- Formats vectoriels (.svg) composant l'identité graphique (icône du programme utilisée par le raccourci Desktop).
-- Potentielles images, ressources UI en dur ou templates requises par des environnements d'installation.
+Ce dossier contient l'icône vectorielle de SerialTerm et les captures d'écran utilisées dans la documentation et les paquets.

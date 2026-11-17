@@ -1,9 +1,3 @@
-# Source Code
+# Code source
 
-Ce répertoire contient le code source de l'application **SerialTerm**.
-L'architecture suit le principe de séparation des préoccupations (Clean Architecture) :
-
-- `core/` : Logique métier et protocoles série. Totalement agnostique de l'interface graphique.
-- `ui/` : Interface utilisateur implémentée avec GTK4 et Libadwaita.
-- `application/` : Couche d'orchestration (Use Cases) reliant l'interface aux fonctions du backend.
-- `app.rs` / `main.rs` : Point d'entrée et initialisation (bootstrap) du programme.
+`core/` gère les paramètres et la liaison série sans dépendre de GTK. `application/` contient la validation des données et les cas d'utilisation. `ui/` regroupe les fenêtres et les commandes de l'interface. `main.rs` et `app.rs` démarrent l'application.

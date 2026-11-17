@@ -1,6 +1,6 @@
 # Packaging
 
-Index des guides de packaging de SerialTerm.
+Guides de création des paquets SerialTerm.
 
 La validation développeur est décrite dans [DEVELOPMENT.md](DEVELOPMENT.md).
 La CI d'intégration continue est décrite dans [.github/workflows/ci.yml](.github/workflows/ci.yml).
@@ -18,7 +18,7 @@ Le projet fournit des scripts PowerShell pour Windows 11.
 
 ### Prérequis
 
-Installer PowerShell 7, Rust, MSYS2, la cible GNU Windows et la toolchain GTK4/Libadwaita :
+Installer PowerShell 7, Rust, MSYS2, la cible GNU Windows et les bibliothèques GTK 4 et Libadwaita :
 
 ```powershell
 pwsh -ExecutionPolicy Bypass -File .\scripts\install-deps-windows.ps1
@@ -30,29 +30,29 @@ Validation Windows versionnée recommandée avant packaging :
 pwsh -ExecutionPolicy Bypass -File .\scripts\pre-commit-checks-windows.ps1
 ```
 
-### Build EXE
+### Créer l’exécutable
 
 ```powershell
 pwsh -ExecutionPolicy Bypass -File .\scripts\build-exe.ps1 -IncludeGtkRuntime
 ```
 
-### Build installateur
+### Créer l’installateur
 
 ```powershell
 winget install JRSoftware.InnoSetup
 pwsh -ExecutionPolicy Bypass -File .\scripts\build-installer.ps1 -IncludeGtkRuntime
 ```
 
-### Artefacts générés
+### Fichiers produits
 
 - `dist/windows/SerialTerm/serial-term.exe`
 - `dist/windows/serial-term-win64-release.zip`
 - `dist/windows/installer/serial-term-setup-win64-v<version>.exe`
 
-Le flag `-IncludeGtkRuntime` copie les DLL GTK depuis `C:\msys64\mingw64\bin`.
-Sans ce flag, l'exécutable dépend d'un runtime GTK installé sur la machine cible.
+L’option `-IncludeGtkRuntime` copie les bibliothèques GTK depuis `C:\msys64\mingw64\bin`.
+Sans cette option, les bibliothèques GTK doivent être installées sur la machine cible.
 
 ## Règle de publication
 
-Valider localement avec le gate standard Linux (`bash scripts/pre-commit-checks.sh`) ou le gate Windows documenté (`pwsh -ExecutionPolicy Bypass -File .\scripts\pre-commit-checks-windows.ps1`) avant tout packaging.
-Ne pas produire d'artefact depuis un état non validé.
+Exécutez les contrôles Linux (`bash scripts/pre-commit-checks.sh`) ou les contrôles Windows (`pwsh -ExecutionPolicy Bypass -File .\scripts\pre-commit-checks-windows.ps1`) avant de créer un paquet.
+Conservez les résultats des contrôles avec la version publiée.

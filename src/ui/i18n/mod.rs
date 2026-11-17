@@ -63,7 +63,7 @@ impl UiLang {
             .unwrap_or_default() // Défaut : chaîne vide si non définie.
             .to_lowercase(); // Normaliser pour la comparaison.
         if lang.starts_with("fr") {
-            // Toute locale française (fr_FR, fr_BE…).
+            // Toute locale française (fr_FR, fr_BE...).
             Self::Fr
         } else {
             Self::En // Anglais par défaut pour tout autre locale.

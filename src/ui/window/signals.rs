@@ -4,6 +4,7 @@ use std::time::Duration;
 use gtk4::glib;
 use gtk4::prelude::*;
 
+#[cfg(test)]
 use crate::core::connection::ConnectionCommand;
 
 use super::shell::MainWindow;
@@ -48,31 +49,11 @@ impl MainWindow {
                     refresh_button.set_icon_name("process-working-symbolic");
                     w.show_toast(w.lang.serial_ports_refreshing());
 
-                    let (sender, receiver) = async_channel::bounded::<
-                        Vec<crate::core::serial_manager::SerialPortInfo>,
-                    >(1);
-
                     glib::spawn_future_local(async move {
-                        if let Ok(ports) = receiver.recv().await {
-                            w.connection_panel
-                                .serial_panel
-                                .refresh_button
-                                .set_sensitive(true);
-                            w.connection_panel
-                                .serial_panel
-                                .refresh_button
-                                .set_icon_name("view-refresh-symbolic");
-                            w.connection_panel
-                                .serial_panel
-                                .update_ports_from_list(&ports);
-                            w.show_bottom_notice(w.lang.serial_ports_refreshed());
-                            w.show_toast(w.lang.serial_ports_refreshed());
-                        }
-                    });
-
-                    std::thread::spawn(move || {
-                        let ports = crate::core::serial_manager::list_serial_ports();
-                        let _ = sender.try_send(ports);
+                        w.refresh_serial_ports().await;
+                        refresh_button.set_sensitive(true);
+                        refresh_button.set_icon_name("view-refresh-symbolic");
+                        w.show_bottom_notice(w.lang.serial_ports_refreshed());
                     });
                 });
         }
@@ -159,9 +140,8 @@ impl MainWindow {
                 w.settings.borrow_mut().set_window_size(width, height);
                 let _ = w.settings.borrow().save();
 
-                if let Some(tx) = w.connection_tx.borrow_mut().take() {
-                    let _ = tx.try_send(ConnectionCommand::Disconnect);
-                }
+                // Annuler aussi les reconnexions et les résultats asynchrones en attente.
+                w.disconnect();
 
                 log::info!("Application fermée proprement.");
                 glib::Propagation::Proceed
@@ -237,10 +217,14 @@ mod tests {
 
         *window.connection_tx.borrow_mut() = Some(tx);
 
+        let connection_generation = window.connection_generation.get();
+        let reconnect_generation = window.reconnect_generation.get();
         let _ = window.window.emit_by_name::<bool>("close-request", &[]);
         while glib::MainContext::default().iteration(false) {}
 
         assert!(window.connection_tx.borrow().is_none());
+        assert_ne!(window.connection_generation.get(), connection_generation);
+        assert_ne!(window.reconnect_generation.get(), reconnect_generation);
         assert!(matches!(rx.try_recv(), Ok(ConnectionCommand::Disconnect)));
 
         close_window_for_tests(&window);

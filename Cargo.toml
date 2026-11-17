@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["M@nu <terraspi13@gmail.com>"]
 description = "Terminal série avec interface GTK4/Libadwaita"
 license = "GPL-3.0-or-later"
-rust-version = "1.75"
+rust-version = "1.85"
 
 [dependencies]
 # GTK4 + Libadwaita pour l'interface

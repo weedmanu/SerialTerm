@@ -121,40 +121,22 @@ impl MainWindow {
             return;
         };
 
-        let data_len = u64::try_from(data.len()).unwrap_or(0);
-
         let Some(tx) = self.connection_tx.borrow().as_ref().cloned() else {
             self.terminal.append_error(self.lang.not_connected_error());
             return;
         };
 
-        let window = Rc::downgrade(self);
-        let data_for_async = data;
-        let payload = text;
-        gtk4::glib::spawn_future_local(async move {
-            let Some(window) = window.upgrade() else {
-                return;
-            };
-
-            match tx.send(ConnectionCommand::SendData(data_for_async)).await {
-                Ok(()) => {
-                    window
-                        .tx_bytes
-                        .set(window.tx_bytes.get().saturating_add(data_len));
-                    window.update_stats();
-                    window.terminal.append_sent(&format!("→ {payload}\n"));
-                    window.input.entry.set_text("");
-                    window.input.entry.grab_focus();
-                }
-                Err(_) => {
-                    window.terminal.append_error(&format!(
-                        "{} {}",
-                        window.lang.send_error(),
-                        window.lang.status_disconnected()
-                    ));
-                }
+        // Ne pas accumuler de futures d'envoi quand la file est saturée.
+        match tx.try_send(ConnectionCommand::SendData(data)) {
+            Ok(()) => {
+                self.input.entry.set_text("");
+                self.input.entry.grab_focus();
             }
-        });
+            Err(error) => {
+                self.terminal
+                    .append_error(&format!("{} {error}", self.lang.send_error()));
+            }
+        }
     }
 
     /// Sauvegarde le terminal dans un fichier texte.
