@@ -59,7 +59,7 @@ fn cells_for_pixels(pixels: i32, cell_pixels: i32) -> u32 {
 }
 
 fn short_timestamp() -> String {
-    chrono::Local::now().format("%H:%M:%S").to_string()
+    jiff::Zoned::now().strftime("%H:%M:%S").to_string()
 }
 
 impl TerminalPanel {
@@ -534,8 +534,7 @@ impl TerminalPanel {
         self.append_with_tag(text, "tx"); // tag orange pour l'écho TX
     }
 
-    #[cfg(test)]
-    /// Helper de test : ajoute un **message système** horodaté au terminal.
+    /// Ajoute un message système horodaté au terminal.
     pub fn append_system(&self, text: &str) {
         let timestamp = short_timestamp();
         self.timestamped_log

@@ -29,7 +29,7 @@ fn save_logs_with_mode(
         .title(lang.save_logs_dialog_title(mode))
         .initial_name(format!(
             "serial_log_{}.txt",
-            chrono::Local::now().format("%Y%m%d_%H%M%S")
+            jiff::Zoned::now().strftime("%Y%m%d_%H%M%S")
         ))
         .build();
 
@@ -45,30 +45,47 @@ fn save_logs_with_mode(
         Some(&parent_window),
         gio::Cancellable::NONE,
         move |result| {
-            if let Ok(file) = result {
-                if let Some(path) = file.path() {
-                    match std::fs::write(&path, &export_text) {
-                        Ok(()) => {
-                            log::info!("Logs sauvegardés dans {}", path.display());
-                            queue_toast(
-                                &window,
-                                &toast_overlay,
-                                &format!("{} {}", lang_saved, path.display()),
-                                4,
-                            );
-                            set_bottom_notice(
-                                &notice_label,
-                                &notice_generation,
-                                &format!("{} {}", lang_saved_term, path.display()),
-                                Some(4),
-                            );
-                        }
-                        Err(e) => {
-                            log::error!("Erreur de sauvegarde : {e}");
-                        }
+            let file = match result {
+                Ok(file) => file,
+                Err(error) => {
+                    if !error.matches(gtk4::DialogError::Dismissed)
+                        && !error.matches(gtk4::DialogError::Cancelled)
+                    {
+                        log::error!("Impossible de choisir le fichier d'export : {error}");
+                        queue_toast(&window, &toast_overlay, lang.logs_save_error(), 4);
                     }
+                    return;
                 }
-            }
+            };
+            let destination = file.parse_name();
+            file.replace_contents_async(
+                export_text.into_bytes(),
+                None,
+                false,
+                gio::FileCreateFlags::NONE,
+                gio::Cancellable::NONE,
+                move |result| match result {
+                    Ok(_) => {
+                        log::info!("Logs sauvegardés dans {destination}");
+                        queue_toast(
+                            &window,
+                            &toast_overlay,
+                            &format!("{lang_saved} {destination}"),
+                            4,
+                        );
+                        set_bottom_notice(
+                            &notice_label,
+                            &notice_generation,
+                            &format!("{lang_saved_term} {destination}"),
+                            Some(4),
+                        );
+                    }
+                    Err((_, error)) => {
+                        log::error!("Erreur de sauvegarde vers {destination} : {error}");
+                        queue_toast(&window, &toast_overlay, lang.logs_save_error(), 4);
+                    }
+                },
+            );
         },
     );
 }
@@ -81,7 +98,7 @@ impl MainWindow {
     }
 
     /// Construit le manager série + persiste les réglages UI.
-    pub(super) fn build_serial_manager(&self) -> Result<Box<dyn Connection>, String> {
+    pub(super) fn build_serial_manager(&self) -> Result<(Box<dyn Connection>, String), String> {
         let sp = &self.connection_panel.serial_panel;
         let input = SerialConnectionInput {
             port: sp
@@ -110,7 +127,7 @@ impl MainWindow {
             }
         }
 
-        Ok(Box::new(SerialManager::new(config)))
+        Ok((Box::new(SerialManager::new(config)), input.port))
     }
 
     /// Envoie la ligne saisie vers la connexion active.

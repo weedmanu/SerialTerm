@@ -176,7 +176,8 @@ fn infer_friendly_name(
     )
 }
 
-fn is_linux_hotplug_device_name(device: &str) -> bool {
+#[cfg(target_os = "linux")]
+pub fn is_linux_hotplug_device_name(device: &str) -> bool {
     let Some(device_name) = Path::new(device).file_name().and_then(|name| name.to_str()) else {
         return false;
     };

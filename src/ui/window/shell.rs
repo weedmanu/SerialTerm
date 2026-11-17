@@ -216,7 +216,7 @@ impl MainWindow {
     }
 
     pub(super) fn sync_ui_state_to_settings(&self) {
-        let serial_snapshot = self.connection_panel.serial_panel.snapshot_settings();
+        let mut serial_snapshot = self.connection_panel.serial_panel.snapshot_settings();
         let line_ending = match self.input.line_ending_dropdown.selected() {
             1 => "CR",
             2 => "CRLF",
@@ -226,6 +226,9 @@ impl MainWindow {
 
         let mut settings = self.settings.borrow_mut();
         let app_settings = settings.settings_mut();
+        if serial_snapshot.port.is_empty() {
+            serial_snapshot.port.clone_from(&app_settings.serial.port);
+        }
         app_settings.serial = serial_snapshot;
         app_settings.ui.show_sidebar = self.header.toggle_sidebar_button.is_active();
         app_settings.ui.stop_scroll = self.input.stop_scroll_enabled();

@@ -4,13 +4,19 @@ Toutes les modifications notables de **SerialTerm** sont documentées dans ce fi
 
 Le journal suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le versionnement [SemVer](https://semver.org/lang/fr/).
 
-## Non publié
+## 1.1.0 · 2026-11-17
 
 ### Corrigé
 
-- Chaque connexion et reconnexion efface l'affichage et les exports précédents,
-  réinitialise le parseur ANSI et les compteurs, puis purge les tampons du port.
-  Une erreur de purge empêche désormais le démarrage de la session.
+- La reconnexion automatique attend le port d’origine et conserve l’historique.
+  Sous Linux, un port USB ou Bluetooth sans alias stable requiert une
+  reconnexion manuelle.
+- Une ouverture réussie purge les tampons du port et réinitialise le parseur
+  ANSI et les compteurs. Seule une connexion manuelle réussie efface
+  l’historique précédent. Une erreur de purge empêche l’ouverture.
+- Les échecs d’enregistrement du journal sont affichés dans l’interface.
+- Le workflow Debian valide le commit puis produit le paquet et son archive
+  source à partir des mêmes fichiers, avec leurs sommes SHA-256.
 - Le compteur TX et l'écho local attendent la confirmation de l'acteur série.
   Une file d'envoi pleine conserve la saisie et affiche une erreur.
 - Le délai d'envoi couvre l'écriture complète et l'attente du tampon pilote,
@@ -26,6 +32,8 @@ Le journal suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le v
 - Dépendance de construction Debian `libudev-dev` déclarée.
 
 ### Modifié
+
+- Tokio 1.54.1 et Jiff remplacent les dépendances signalées par RustSec.
 
 - Minimum Rust annoncé aligné sur les dépendances verrouillées : 1.85.
 - Le réglage de délai série est explicitement présenté comme un délai d'envoi.

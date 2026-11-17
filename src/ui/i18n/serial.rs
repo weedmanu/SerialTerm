@@ -234,6 +234,13 @@ impl UiLang {
         }
     }
 
+    pub const fn serial_choose_port(self) -> &'static str {
+        match self {
+            Self::Fr => "Choisir un port série",
+            Self::En => "Choose a serial port",
+        }
+    }
+
     /// Texte affiché quand aucun port série n'est disponible.
     pub const fn serial_no_port(self) -> &'static str {
         match self {

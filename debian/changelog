@@ -1,3 +1,12 @@
+serial-term (1.1.0) unstable; urgency=medium
+
+  * Keep the session log on failed opens and automatic reconnects.
+  * Reconnect only to the expected serial device.
+  * Report log export failures in the UI.
+  * Build the package with the locked dependencies.
+
+ -- Manu <terraspi13@gmail.com>  Tue, 17 Nov 2026 12:00:00 +0100
+
 serial-term (1.0.0) focal; urgency=medium
 
   * Prepare stable release 1.0.0.

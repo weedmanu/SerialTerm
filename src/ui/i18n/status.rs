@@ -78,6 +78,14 @@ impl UiLang {
         }
     }
 
+    #[cfg(target_os = "linux")]
+    pub const fn auto_reconnect_unstable_port_notice(self) -> &'static str {
+        match self {
+            Self::Fr => "Port sans alias stable. Sélectionnez-le pour vous reconnecter.",
+            Self::En => "Port has no stable alias. Select it to reconnect.",
+        }
+    }
+
     /// Message affiché quand le port n'est pas disponible lors d'une tentative automatique.
     pub const fn auto_reconnect_port_unavailable_notice(self) -> &'static str {
         match self {

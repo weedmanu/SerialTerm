@@ -16,13 +16,13 @@
 //! ```
 //!
 //! - Le niveau de log est paramétrable (`Trace`, `Debug`, `Info`, `Warn`, `Error`).
-//! - Le format utilise `chrono::Local` pour l'heure locale.
+//! - Le format utilise `jiff::Zoned` pour l'heure locale.
 //! - `{level:<5}` aligne les niveaux sur 5 caractères pour faciliter la lecture.
 
 use std::io::Write; // Trait nécessaire pour `writeln!(buf, …)` dans le formateur.
 
-use chrono::Local; // Horodatage en heure locale.
 use env_logger::Builder; // Constructeur du logger configurable.
+use jiff::Zoned; // Horodatage en heure locale.
 use log::LevelFilter; // Enum de niveau de filtrage des messages.
 
 /// Initialise le système de logging global avec le niveau spécifié.
@@ -45,7 +45,7 @@ pub fn init_logger(level: LevelFilter) {
         .filter_level(level) // Appliquer le filtre de niveau global.
         .format(|buf, record| {
             // Fermeture de formatage appelée pour chaque message.
-            let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S"); // Heure locale formatée.
+            let timestamp = Zoned::now().strftime("%Y-%m-%d %H:%M:%S"); // Heure locale formatée.
             let level = record.level(); // Niveau du message (INFO, WARN, ERROR…).
             let target = record.target(); // Module source du message (ex: `core::serial_manager`).
                                           // Écrire la ligne formatée ; `{level:<5}` aligne sur 5 caractères.
@@ -75,8 +75,8 @@ pub fn parse_level_filter(level: &str) -> LevelFilter {
 fn try_open_log_file(log_directory: &str) -> Option<Box<dyn Write + Send + 'static>> {
     let dir = std::path::Path::new(log_directory);
     std::fs::create_dir_all(dir).ok()?;
-    let filename = Local::now()
-        .format("serial_term_%Y%m%d_%H%M%S.log")
+    let filename = Zoned::now()
+        .strftime("serial_term_%Y%m%d_%H%M%S.log")
         .to_string();
     let file = std::fs::File::create(dir.join(filename)).ok()?;
     Some(Box::new(std::io::BufWriter::new(file)))
@@ -113,7 +113,7 @@ pub fn init_logger_with_config(
                 .filter_level(level)
                 .target(env_logger::Target::Pipe(file_writer))
                 .format(|buf, record| {
-                    let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S");
+                    let timestamp = Zoned::now().strftime("%Y-%m-%d %H:%M:%S");
                     let lvl = record.level();
                     let target = record.target();
                     writeln!(buf, "[{timestamp}] {lvl:<5} {target} - {}", record.args())

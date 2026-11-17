@@ -31,11 +31,11 @@ use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
 
-use chrono::Local;
 use gtk4::prelude::*;
 use gtk4::{
     Box as GtkBox, SearchBar, SearchEntry, TextBuffer, TextMark, TextTag, TextTagTable, TextView,
 };
+use jiff::Zoned;
 use vte::{Parser, Perform};
 
 use crate::ui::i18n::UiLang;
@@ -147,7 +147,8 @@ impl TimestampedLogRecorder {
 
         for ch in text.chars() {
             if self.current_timestamp.is_none() {
-                self.current_timestamp = Some(Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
+                self.current_timestamp =
+                    Some(Zoned::now().strftime("%Y-%m-%d %H:%M:%S").to_string());
             }
             if self.current_kind.is_none() {
                 self.current_kind = Some(kind);
@@ -157,7 +158,8 @@ impl TimestampedLogRecorder {
             if self.current_line.len() >= 65_536 {
                 self.finish_current_line();
                 self.current_kind = Some(kind);
-                self.current_timestamp = Some(Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
+                self.current_timestamp =
+                    Some(Zoned::now().strftime("%Y-%m-%d %H:%M:%S").to_string());
             }
             self.current_line.push(ch);
 
@@ -176,7 +178,7 @@ impl TimestampedLogRecorder {
         let timestamp = self
             .current_timestamp
             .take()
-            .unwrap_or_else(|| Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
+            .unwrap_or_else(|| Zoned::now().strftime("%Y-%m-%d %H:%M:%S").to_string());
         let kind = self.current_kind.take().unwrap_or(LogLineKind::Rx);
         let text = std::mem::take(&mut self.current_line);
 

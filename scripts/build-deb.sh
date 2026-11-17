@@ -32,6 +32,11 @@ if [ -z "$APP_VERSION" ]; then
     echo "Erreur : impossible de déterminer la version depuis Cargo.toml" >&2
     exit 1
 fi
+DEB_VERSION="$(dpkg-parsechangelog -S Version)"
+if [ "$APP_VERSION" != "$DEB_VERSION" ]; then
+    echo "Versions incohérentes : Cargo $APP_VERSION, Debian $DEB_VERSION." >&2
+    exit 1
+fi
 mkdir -p "$OUT_DIR"
 
 echo "-----------------------------------------------------------"
@@ -51,44 +56,23 @@ for cmd in cargo debuild lintian; do
     fi
 done
 
-# Vérifier les dépendances de développement
-echo "Dépendances de développement vérifiées."
+# debian/rules compile le binaire depuis Cargo.lock.
+debuild -b -us -uc
 
-# Nettoyer les builds antérieurs
-echo ""
-echo " Nettoyage des builds antérieurs..."
-
-rm -f ../${PKG_NAME}_* 2>/dev/null || true
-rm -f "$OUT_DIR"/*.deb 2>/dev/null || true
-
-# Compiler le projet en release
-echo ""
-echo " Compilation en mode release (cela peut prendre quelques secondes)..."
-cargo build --release
-
-# Créer le paquet avec debuild
-echo ""
-echo " Création du paquet Debian avec debuild..."
-echo ""
-
-debuild -us -uc --lintian-opts --suppress-tags=bad-distribution-in-changes-file
-
-echo ""
-echo " Déplacement des paquets et purge des caches..."
-mv ../${PKG_NAME}_*.deb "$OUT_DIR/"
-
-dh_clean 2>/dev/null || true
-rm -f ../${PKG_NAME}_* 2>/dev/null || true
+ARCH="$(dpkg-architecture -qDEB_HOST_ARCH)"
+PACKAGE="${PKG_NAME}_${APP_VERSION}_${ARCH}.deb"
+mv "../$PACKAGE" "$OUT_DIR/$PACKAGE"
+dh_clean
 
 echo ""
 echo "-----------------------------------------------------------"
 echo "Succès : Le paquet .deb a été créé."
 echo ""
 echo " Fichier généré:"
-ls -lh "$OUT_DIR"/*.deb | tail -1 | awk '{print "   " $9 " (" $5 ")"}'
+ls -lh "$OUT_DIR/$PACKAGE"
 echo ""
 echo "Installation :"
-echo "  sudo dpkg -i dist/debian/serial-term_${APP_VERSION}*.deb"
+echo "  sudo apt install ./$OUT_DIR/$PACKAGE"
 echo ""
 echo "Désinstallation :"
 echo "  sudo apt remove serial-term"

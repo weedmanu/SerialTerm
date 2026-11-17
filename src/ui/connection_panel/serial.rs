@@ -330,57 +330,62 @@ impl SerialPanel {
     /// Met à jour l'UI avec une liste de ports déjà collectée (thread GTK uniquement).
     pub fn update_ports_from_list(&self, ports: &[crate::core::serial_manager::SerialPortInfo]) {
         let previous_device = self.selected_port();
+        self.replace_port_list(ports);
+        let kept_selection = previous_device
+            .as_deref()
+            .is_some_and(|device| self.select_port_by_device(device));
+        if !kept_selection && ports.len() == 1 && self.auto_select_single_port_enabled() {
+            self.port_dropdown.set_selected(1);
+        }
+        self.update_selected_port_tooltip();
+        log::info!("Ports série rafraîchis : {} trouvé(s)", ports.len());
+    }
 
+    /// Attend le port attendu, même lorsqu'un autre port est disponible.
+    pub fn update_ports_for_reconnect(
+        &self,
+        ports: &[crate::core::serial_manager::SerialPortInfo],
+        expected_port: &str,
+    ) -> bool {
+        self.replace_port_list(ports);
+        let found = self.select_port_by_device(expected_port);
+        self.update_selected_port_tooltip();
+        found
+    }
+
+    fn replace_port_list(&self, ports: &[crate::core::serial_manager::SerialPortInfo]) {
         // Vider le modèle existant
         self.port_model.splice(0, self.port_model.n_items(), &[]);
 
-        let mut entries = Vec::new();
-
-        if ports.is_empty() {
-            self.port_model.append(self.lang.serial_no_port());
-            entries.push(PortEntry {
-                device: String::new(),
-                stable_path: String::new(),
-                friendly_name: String::new(),
-                tooltip: self.lang.serial_no_port_tooltip().to_string(),
-            });
+        let (placeholder, tooltip) = if ports.is_empty() {
+            (
+                self.lang.serial_no_port(),
+                self.lang.serial_no_port_tooltip(),
+            )
         } else {
-            for port in ports {
-                let label = build_port_dropdown_label(port);
-                self.port_model.append(&label);
-                entries.push(PortEntry {
-                    device: port.device.clone(),
-                    stable_path: port.stable_path.clone(),
-                    friendly_name: port.friendly_name.clone(),
-                    tooltip: build_port_dropdown_tooltip(self.lang, port),
-                });
-            }
+            (
+                self.lang.serial_choose_port(),
+                self.lang.serial_port_tooltip(),
+            )
+        };
+        self.port_model.append(placeholder);
+        let mut entries = vec![PortEntry {
+            device: String::new(),
+            stable_path: String::new(),
+            friendly_name: String::new(),
+            tooltip: tooltip.to_string(),
+        }];
+        for port in ports {
+            self.port_model.append(&build_port_dropdown_label(port));
+            entries.push(PortEntry {
+                device: port.device.clone(),
+                stable_path: port.stable_path.clone(),
+                friendly_name: port.friendly_name.clone(),
+                tooltip: build_port_dropdown_tooltip(self.lang, port),
+            });
         }
-
         *self.port_entries.borrow_mut() = entries;
-
-        if let Some(device) = previous_device {
-            if self.select_port_by_device(&device) {
-                self.update_selected_port_tooltip();
-                log::info!("Port série conservé après rafraîchissement : {device}");
-                log::info!("Ports série rafraîchis : {} trouvé(s)", ports.len());
-                return;
-            }
-        }
-
-        if ports.len() == 1 && self.auto_select_single_port_enabled() {
-            self.port_dropdown.set_selected(0);
-            self.update_selected_port_tooltip();
-            if let Some(port) = ports.first() {
-                log::info!("Port série auto-sélectionné : {}", port.device);
-            }
-            log::info!("Ports série rafraîchis : {} trouvé(s)", ports.len());
-            return;
-        }
-
         self.port_dropdown.set_selected(0);
-        self.update_selected_port_tooltip();
-        log::info!("Ports série rafraîchis : {} trouvé(s)", ports.len());
     }
 
     /// Retourne le port sélectionné (nom device).

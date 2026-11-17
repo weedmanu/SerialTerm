@@ -174,6 +174,33 @@ mod tests {
     }
 
     #[gtk4::test]
+    fn serial_reconnect_waits_for_the_same_device_after_renumbering() {
+        let panel = SerialPanel::new(UiLang::Fr);
+        let expected = "/dev/serial/by-id/adapter-a";
+        let other = SerialPortInfo {
+            device: "/dev/ttyUSB0".into(),
+            manufacturer: String::new(),
+            description: String::new(),
+            friendly_name: "Adapter B".into(),
+            stable_path: "/dev/serial/by-id/adapter-b".into(),
+        };
+        for auto_select in [false, true] {
+            panel.set_auto_select_single_port(auto_select);
+            assert!(!panel.update_ports_for_reconnect(std::slice::from_ref(&other), expected));
+            assert_eq!(panel.effective_port(), None);
+        }
+        let returned = SerialPortInfo {
+            device: "/dev/ttyUSB1".into(),
+            manufacturer: String::new(),
+            description: String::new(),
+            friendly_name: "Adapter A".into(),
+            stable_path: expected.into(),
+        };
+        assert!(panel.update_ports_for_reconnect(&[other, returned], expected));
+        assert_eq!(panel.effective_port().as_deref(), Some(expected));
+    }
+
+    #[gtk4::test]
     fn protocol_switch_stack_keeps_vertical_slide_with_size_interpolation() {
         let panel = ConnectionPanel::new(UiLang::Fr);
 

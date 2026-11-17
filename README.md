@@ -4,7 +4,7 @@
 
 SerialTerm est une application graphique pour communiquer avec un appareil par port série. Elle permet de régler la connexion, de lire les données reçues et d'enregistrer les échanges dans un fichier texte. L'interface utilise GTK 4 et Libadwaita.
 
-La version 1.0.0 prend en charge les connexions série.
+La version 1.1.0 prend en charge les connexions série.
 
 ## Fonctions
 
@@ -53,7 +53,7 @@ Le script [install-deps.sh](scripts/install-deps.sh) prépare aussi Debian, Ubun
 3. Réglez le débit et les autres paramètres de la liaison.
 4. Cliquez sur **Connecter**, puis saisissez une commande en bas de la fenêtre.
 
-Chaque connexion démarre avec un affichage vide. Les anciennes données encore présentes dans les tampons du port sont purgées. Une sauvegarde doit donc être faite avant de se reconnecter si vous souhaitez conserver la session affichée.
+Une ouverture purge les tampons du port. Une connexion manuelle réussie démarre une nouvelle session. Un échec d’ouverture ou une reconnexion automatique conserve l’historique affiché, dans les limites de sa capacité. Sous Linux, les ports USB et Bluetooth sans alias stable demandent une reconnexion manuelle.
 
 Les préférences sont enregistrées dans `~/.config/serial-term/settings.json`. Si ce fichier contient un JSON invalide, l'application avertit l'utilisateur et en conserve une copie sous le nom `settings.json.bak` avant la prochaine sauvegarde.
 

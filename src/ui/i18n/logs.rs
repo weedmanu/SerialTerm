@@ -116,6 +116,15 @@ impl UiLang {
         }
     }
 
+    pub const fn logs_save_error(self) -> &'static str {
+        match self {
+            Self::Fr => {
+                "Impossible d’enregistrer le journal. Vérifiez la destination et réessayez."
+            }
+            Self::En => "Could not save the log. Check the destination and try again.",
+        }
+    }
+
     /// Préfixe message terminal logs sauvegardés.
     pub const fn logs_saved_term_prefix(
         self,

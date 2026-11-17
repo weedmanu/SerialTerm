@@ -20,7 +20,7 @@ Consultez également [PACKAGING.md](PACKAGING.md) et [DEVELOPMENT.md](DEVELOPMEN
 bash scripts/build-deb.sh
 ```
 
-Le script exécute `cargo build --release`, puis appelle `debuild`. Ce dernier utilise `debian/rules` pour produire `serial-term_<version>_amd64.deb`.
+Le script vérifie la cohérence des versions Cargo et Debian puis lance `debuild`. La règle Debian appelle `cargo build --locked --release` pour produire `serial-term_<version>_amd64.deb`.
 
 Le paquet est placé dans `dist/debian/`.
 
@@ -47,7 +47,7 @@ Exécutable (`chmod +x debian/rules`). Utilise `dh` (debhelper mode modernisé) 
 
 ```makefile
 override_dh_auto_build:
-    cargo build --release
+    cargo build --locked --release
 
 override_dh_auto_install:
     # Installe binaire + icône + entrée .desktop
@@ -78,7 +78,7 @@ Entrée FDO bilingue FR/EN. Champs principaux :
 
 ## CI automatisée
 
-Le workflow [`.github/workflows/package-deb.yml`](.github/workflows/package-deb.yml) déclenche un build `.deb` automatiquement lors d'un push de tag `v*` ou manuellement via `workflow_dispatch`.
+Le workflow [`.github/workflows/package-deb.yml`](.github/workflows/package-deb.yml) se lance sur un tag `v*` ou manuellement. Il exécute les contrôles qualité, extrait une archive du commit et compile le paquet depuis cette archive. Le paquet, l’archive, le commit et les sommes SHA-256 sont conservés dans le même artefact.
 
 ## Dépendances de build
 
@@ -122,6 +122,6 @@ Le paquet est actuellement déclaré pour `amd64` dans `debian/control`. Une ver
 
 ## Nouvelle version
 
-1. Incrémenter la version dans `Cargo.toml`.
-2. Ajouter une entrée dans `debian/changelog` (`dch -i`).
-3. Relancer `bash scripts/build-deb.sh`.
+1. Aligner la version dans `Cargo.toml`, `Cargo.lock` et `debian/changelog`.
+2. Valider les sources, puis marquer le commit avec un tag `vX.Y.Z`.
+3. Récupérer l’artefact du workflow Debian et vérifier ses sommes SHA-256.
