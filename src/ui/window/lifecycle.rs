@@ -7,7 +7,7 @@ use gtk4::prelude::*;
 
 use super::shell::{set_bottom_notice, MainWindow};
 use crate::core::connection::{
-    spawn_connection_actor, Connection, ConnectionCommand, ConnectionEvent, ConnectionType,
+    spawn_connection_actor, ConnectionCommand, ConnectionEvent, ConnectionType,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -113,11 +113,14 @@ pub(super) fn queue_toast(
     message: &str,
     timeout: u32,
 ) {
-    let window = window.clone();
-    let overlay = overlay.clone();
+    let window = window.downgrade();
+    let overlay = overlay.downgrade();
     let message = message.to_string();
 
     glib::idle_add_local_once(move || {
+        let (Some(window), Some(overlay)) = (window.upgrade(), overlay.upgrade()) else {
+            return;
+        };
         if !window.is_visible() || !window.is_mapped() {
             log::debug!("Toast ignoré car la fenêtre n'est pas encore allouée: {message}");
             return;
@@ -130,9 +133,41 @@ pub(super) fn queue_toast(
 }
 
 impl MainWindow {
+    /// L'énumération peut attendre le système : toujours hors du thread GTK.
+    #[allow(clippy::future_not_send)] // Future locale GTK, exécutée par GLib.
+    async fn scan_serial_ports(&self) -> Option<Vec<crate::core::serial_manager::SerialPortInfo>> {
+        match self
+            .runtime
+            .spawn_blocking(crate::core::serial_manager::list_serial_ports)
+            .await
+        {
+            Ok(ports) => Some(ports),
+            Err(error) => {
+                log::warn!("Énumération des ports interrompue : {error}");
+                None
+            }
+        }
+    }
+
+    #[allow(clippy::future_not_send)] // Future locale GTK, exécutée par GLib.
+    pub(super) async fn refresh_serial_ports(&self) {
+        let Some(ports) = self.scan_serial_ports().await else {
+            return;
+        };
+        let panel = &self.connection_panel.serial_panel;
+        let settings = self.settings.borrow();
+        let saved_port = &settings.settings().serial.port;
+        if panel.effective_port().is_none() && !saved_port.is_empty() {
+            panel.update_ports_for_reconnect(&ports, saved_port);
+        } else {
+            panel.update_ports_from_list(&ports);
+        }
+    }
+
     fn handle_connection_event(
         self: &Rc<Self>,
         event: Result<ConnectionEvent, async_channel::RecvError>,
+        automatic: bool,
     ) -> bool {
         match event {
             Ok(ConnectionEvent::Connected {
@@ -142,20 +177,55 @@ impl MainWindow {
                 let type_label = match conn_type {
                     ConnectionType::Serial => self.lang.serial_label(),
                 };
+                log::debug!("Connexion établie : {description}");
+                if automatic {
+                    self.terminal.reset_ansi_state();
+                    self.terminal.append_system(self.lang.connected_system());
+                } else {
+                    self.terminal.clear();
+                }
+                self.rx_bytes.set(0);
+                self.tx_bytes.set(0);
+                self.update_stats();
+                let baudrate = self.connection_panel.serial_panel.selected_baudrate();
+                let baud_unit = self.lang.serial_baud_unit();
+                let connected_status = self
+                    .connection_panel
+                    .serial_panel
+                    .selected_port_friendly_name()
+                    .map_or_else(
+                        || {
+                            format!(
+                                "{} {type_label} : {baudrate} {baud_unit}",
+                                self.lang.connected_system()
+                            )
+                        },
+                        |device| {
+                            format!(
+                                "{} {type_label} : {device}, {baudrate} {baud_unit}",
+                                self.lang.connected_system()
+                            )
+                        },
+                    );
                 self.set_connected(true);
-                self.set_status(
-                    &format!(
-                        "{} {type_label} — {description}",
-                        self.lang.connected_system()
-                    ),
-                    true,
-                );
-                self.show_bottom_notice(&format!(
-                    "{} [{type_label}] {description}",
-                    self.lang.connected_system()
-                ));
+                self.set_status(&connected_status, true);
+                self.show_bottom_notice(&connected_status);
                 self.input.grab_focus();
                 self.sync_terminal_size();
+                true
+            }
+            Ok(ConnectionEvent::DataSent(data)) => {
+                self.tx_bytes.set(
+                    self.tx_bytes
+                        .get()
+                        .saturating_add(u64::try_from(data.len()).unwrap_or(0)),
+                );
+                self.update_stats();
+                let payload = String::from_utf8_lossy(&data);
+                self.terminal.append_sent(&format!(
+                    "TX : {}\n",
+                    payload.trim_end_matches(['\r', '\n'])
+                ));
                 true
             }
             Ok(ConnectionEvent::DataReceived(data)) => {
@@ -168,12 +238,10 @@ impl MainWindow {
             Ok(ConnectionEvent::Error(e)) => {
                 self.terminal.append_error(&e);
                 self.handle_disconnect();
-                self.schedule_auto_reconnect();
                 false
             }
             Ok(ConnectionEvent::Disconnected) | Err(_) => {
                 self.handle_disconnect();
-                self.schedule_auto_reconnect();
                 false
             }
         }
@@ -268,14 +336,20 @@ impl MainWindow {
     }
 
     /// Établit la connexion série et démarre la pompe d'événements async.
-    #[allow(clippy::clone_on_ref_ptr)]
     pub(super) fn connect(self: &Rc<Self>) {
-        let manager: Box<dyn Connection> = match self.build_serial_manager() {
-            Ok(m) => m,
+        self.reconnect_generation
+            .set(self.reconnect_generation.get().wrapping_add(1));
+        self.start_connection(false);
+    }
+
+    #[allow(clippy::clone_on_ref_ptr)]
+    fn start_connection(self: &Rc<Self>, automatic: bool) {
+        let (manager, port) = match self.build_serial_manager() {
+            Ok(connection) => connection,
             Err(e) => {
                 self.set_status(self.lang.configuration_error(), false);
                 self.terminal.append_error(&e);
-                self.show_toast(&format!("⚠ {e}"));
+                self.show_toast(&e);
                 log::error!("Erreur de configuration : {e}");
                 return;
             }
@@ -283,8 +357,6 @@ impl MainWindow {
 
         self.set_status(self.lang.status_connecting(), false);
         self.show_bottom_notice(self.lang.status_connecting());
-
-        self.terminal.reset_ansi_state();
 
         let guard = self.runtime.enter();
         let (cmd_tx, event_rx) = spawn_connection_actor(manager);
@@ -302,7 +374,8 @@ impl MainWindow {
                 if this.connection_generation.get() != my_generation {
                     break;
                 }
-                if !this.handle_connection_event(event) {
+                if !this.handle_connection_event(event, automatic) {
+                    this.schedule_auto_reconnect(port);
                     break;
                 }
             }
@@ -412,7 +485,7 @@ impl MainWindow {
         let rx = self.rx_bytes.get();
         let tx = self.tx_bytes.get();
         self.io_bytes_label.set_label(&format!(
-            "RX {} · TX {}",
+            "RX : {} ; TX : {}",
             format_bytes(rx),
             format_bytes(tx)
         ));
@@ -430,14 +503,19 @@ impl MainWindow {
 
     /// Planifie une reconnexion automatique série si l'option est activée.
     #[allow(clippy::clone_on_ref_ptr)]
-    pub(super) fn schedule_auto_reconnect(self: &Rc<Self>) {
+    fn schedule_auto_reconnect(self: &Rc<Self>, port: String) {
         let auto_reconnect = self.connection_panel.serial_panel.auto_reconnect_enabled();
         let delay_ms = self
             .connection_panel
             .serial_panel
             .selected_reconnect_delay_ms();
 
-        if !auto_reconnect {
+        if !auto_reconnect || port.is_empty() {
+            return;
+        }
+        #[cfg(target_os = "linux")]
+        if crate::core::serial_manager::is_linux_hotplug_device_name(&port) {
+            self.show_bottom_notice(self.lang.auto_reconnect_unstable_port_notice());
             return;
         }
 
@@ -460,8 +538,11 @@ impl MainWindow {
         self.show_bottom_notice(&notice);
         log::info!("Reconnexion automatique planifiée dans {delay_ms} ms (génération {gen}).");
 
-        let w = self.clone();
+        let w = Rc::downgrade(self);
         glib::timeout_add_local_once(Duration::from_millis(delay_ms), move || {
+            let Some(w) = w.upgrade() else {
+                return;
+            };
             if w.reconnect_generation.get() != gen {
                 log::debug!("Timer de connexion automatique annulé (génération obsolète).");
                 return;
@@ -471,18 +552,23 @@ impl MainWindow {
                 return;
             }
 
-            w.connection_panel.serial_panel.refresh_ports();
-
-            if w.connection_panel.serial_panel.effective_port().is_none() {
-                log::info!("Port non disponible, nouvelle tentative automatique planifiée.");
-                w.show_bottom_notice(w.lang.auto_reconnect_port_unavailable_notice());
-                w.schedule_auto_reconnect();
-                return;
-            }
-
-            log::info!("Tentative de connexion automatique...");
-            w.show_bottom_notice(w.lang.auto_reconnect_attempt_notice());
-            w.connect();
+            glib::spawn_future_local(async move {
+                let ports = w.scan_serial_ports().await;
+                let panel = &w.connection_panel.serial_panel;
+                if w.reconnect_generation.get() != gen
+                    || w.connection_tx.borrow().is_some()
+                    || !panel.auto_reconnect_enabled()
+                {
+                    return;
+                }
+                if ports.is_some_and(|ports| panel.update_ports_for_reconnect(&ports, &port)) {
+                    w.show_bottom_notice(w.lang.auto_reconnect_attempt_notice());
+                    w.start_connection(true);
+                } else {
+                    w.schedule_auto_reconnect(port);
+                    w.show_bottom_notice(w.lang.auto_reconnect_port_unavailable_notice());
+                }
+            });
         });
     }
 
@@ -492,7 +578,16 @@ impl MainWindow {
         if !self.connection_panel.serial_panel.auto_reconnect_enabled() {
             return;
         }
-        self.schedule_auto_reconnect();
+        let saved_port = self.settings.borrow().settings().serial.port.clone();
+        let port = if saved_port.is_empty() {
+            self.connection_panel
+                .serial_panel
+                .effective_port()
+                .unwrap_or_default()
+        } else {
+            saved_port
+        };
+        self.schedule_auto_reconnect(port);
     }
 }
 
@@ -551,16 +646,66 @@ mod tests {
         .expect("la config de test doit être écrite");
 
         SettingsManager::set_test_config_path(path);
-        let app = libadwaita::Application::builder()
-            .application_id(format!("io.github.tutoelectroweb.serialterm.tests{id}"))
-            .build();
-        app.register(gtk4::gio::Cancellable::NONE)
-            .expect("l'application GTK de test doit pouvoir s'enregistrer");
+        let app = crate::ui::window::shell::test_application();
 
-        let window =
-            MainWindow::new(&app).expect("la fenêtre principale doit pouvoir être construite");
+        let window = MainWindow::new_for_test(&app)
+            .expect("la fenêtre principale doit pouvoir être construite");
         SettingsManager::clear_test_config_path();
         window
+    }
+
+    #[gtk4::test]
+    fn tx_is_only_displayed_after_confirmation_and_full_queue_keeps_input() {
+        let window = build_window_for_tests();
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+        *window.connection_tx.borrow_mut() = Some(tx);
+        window.input.entry.set_text("AT");
+        window.send_data();
+        assert_eq!(window.tx_bytes.get(), 0);
+        assert_eq!(window.terminal.get_text(), "");
+        window.input.entry.set_text("second");
+        window.send_data();
+        assert_eq!(window.input.get_text(), "second");
+        assert_eq!(window.tx_bytes.get(), 0);
+        assert!(matches!(rx.try_recv(), Ok(ConnectionCommand::SendData(_))));
+        window.handle_connection_event(Ok(ConnectionEvent::DataSent(b"AT\n".to_vec())), false);
+        assert_eq!(window.tx_bytes.get(), 3);
+        assert!(window.terminal.get_text().contains("TX : AT\n"));
+        window.disconnect();
+        close_window_for_tests(&window);
+    }
+
+    #[gtk4::test]
+    fn previous_export_survives_failed_open_and_automatic_reconnect() {
+        use crate::ui::terminal_panel::LogExportMode;
+
+        let window = build_window_for_tests();
+        window.terminal.append_ansi(b"ancienne session\n");
+        assert!(!window.handle_connection_event(
+            Ok(ConnectionEvent::Error("Port indisponible".into())),
+            false,
+        ));
+        assert_eq!(
+            window.terminal.export_text(LogExportMode::Raw),
+            "ancienne session\n"
+        );
+
+        for automatic in [true, false] {
+            window.rx_bytes.set(123);
+            window.tx_bytes.set(456);
+            assert!(window.handle_connection_event(
+                Ok(ConnectionEvent::Connected {
+                    conn_type: ConnectionType::Serial,
+                    description: "test".into(),
+                }),
+                automatic,
+            ));
+            let expected = if automatic { "ancienne session\n" } else { "" };
+            assert_eq!(window.terminal.export_text(LogExportMode::Raw), expected);
+            assert_eq!(window.rx_bytes.get(), 0);
+            assert_eq!(window.tx_bytes.get(), 0);
+        }
+        close_window_for_tests(&window);
     }
 
     #[gtk4::test]
@@ -604,6 +749,42 @@ mod tests {
     }
 
     #[gtk4::test]
+    fn connected_status_shows_device_name_without_port_path() {
+        crate::ui::runtime::sanitize_problematic_desktop_theme();
+        let window = build_window_for_tests();
+        let ports = vec![crate::core::serial_manager::SerialPortInfo {
+            device: "/dev/ttyACM0".to_string(),
+            manufacturer: "STMicroelectronics".to_string(),
+            description: "STM32 STLink".to_string(),
+            friendly_name: "STM32 ST-LINK".to_string(),
+            stable_path: "/dev/serial/by-id/usb-STMicroelectronics_STM32_STLink_123-if02"
+                .to_string(),
+        }];
+        window
+            .connection_panel
+            .serial_panel
+            .update_ports_from_list(&ports);
+
+        let should_continue = window.handle_connection_event(
+            Ok(ConnectionEvent::Connected {
+                conn_type: ConnectionType::Serial,
+                description:
+                    "/dev/serial/by-id/usb-STMicroelectronics_STM32_STLink_123-if02 @ 115200"
+                        .to_string(),
+            }),
+            false,
+        );
+
+        assert!(should_continue);
+        assert!(window.status_label.label().contains("STM32 ST-LINK"));
+        assert!(window.status_label.label().contains("115200 bauds"));
+        assert!(!window.status_label.label().contains("/dev/"));
+        assert!(window.status_dot.has_css_class("status-dot-connected"));
+
+        close_window_for_tests(&window);
+    }
+
+    #[gtk4::test]
     fn error_event_is_rendered_then_releases_ui_control() {
         crate::ui::runtime::sanitize_problematic_desktop_theme();
         let window = build_window_for_tests();
@@ -613,9 +794,12 @@ mod tests {
         window.set_connected(true);
         window.set_status(window.lang.connected_system(), true);
 
-        let should_continue = window.handle_connection_event(Ok(ConnectionEvent::Error(
-            "Erreur de communication série: trame invalide détectée".to_string(),
-        )));
+        let should_continue = window.handle_connection_event(
+            Ok(ConnectionEvent::Error(
+                "Erreur de communication série: trame invalide détectée".to_string(),
+            )),
+            false,
+        );
 
         assert!(!should_continue);
         assert!(window.connection_tx.borrow().is_none());
@@ -646,9 +830,12 @@ mod tests {
         window.set_connected(true);
         window.set_status(window.lang.connected_system(), true);
 
-        let should_continue = window.handle_connection_event(Ok(ConnectionEvent::Error(
-            "Port série déconnecté pendant la lecture : Input/output error".to_string(),
-        )));
+        let should_continue = window.handle_connection_event(
+            Ok(ConnectionEvent::Error(
+                "Port série déconnecté pendant la lecture : Input/output error".to_string(),
+            )),
+            false,
+        );
 
         assert!(!should_continue);
         assert!(window.connection_tx.borrow().is_none());

@@ -14,7 +14,7 @@ impl UiLang {
         }
     }
 
-    /// Retourne le texte de statut "Connexion en cours…".
+    /// Retourne le texte de statut "Connexion en cours...".
     pub const fn status_connecting(self) -> &'static str {
         match self {
             Self::Fr => "Connexion en cours...",
@@ -75,6 +75,14 @@ impl UiLang {
         match self {
             Self::Fr => "Tentative de connexion automatique...",
             Self::En => "Attempting automatic connection...",
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    pub const fn auto_reconnect_unstable_port_notice(self) -> &'static str {
+        match self {
+            Self::Fr => "Port sans alias stable. Sélectionnez-le pour vous reconnecter.",
+            Self::En => "Port has no stable alias. Select it to reconnect.",
         }
     }
 
@@ -164,8 +172,8 @@ impl UiLang {
     /// Erreur non connecté.
     pub const fn not_connected_error(self) -> &'static str {
         match self {
-            Self::Fr => "Non connecté — impossible d'envoyer.",
-            Self::En => "Not connected — cannot send.",
+            Self::Fr => "Envoi impossible : aucun port connecté.",
+            Self::En => "Cannot send: no port is connected.",
         }
     }
 
@@ -189,6 +197,14 @@ impl UiLang {
         }
     }
 
+    /// Unité du débit série affichée dans la barre d'état.
+    pub const fn serial_baud_unit(self) -> &'static str {
+        match self {
+            Self::Fr => "bauds",
+            Self::En => "baud",
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Panneau de saisie (input_panel.rs)
     // -------------------------------------------------------------------------
@@ -208,8 +224,8 @@ impl UiLang {
     /// Placeholder de la barre de recherche dans le terminal.
     pub const fn search_terminal_placeholder(self) -> &'static str {
         match self {
-            Self::Fr => "Rechercher dans le terminal…",
-            Self::En => "Search in terminal…",
+            Self::Fr => "Rechercher dans le terminal...",
+            Self::En => "Search in terminal...",
         }
     }
 

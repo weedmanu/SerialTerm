@@ -67,31 +67,27 @@ fn serial_io_context(action: &str, error: &std::io::Error) -> String {
 
 /// Enrichit le message d'erreur d'ouverture de port avec une action corrective concrète.
 ///
-/// Traduit les codes d'erreur `tokio_serial::ErrorKind` en messages compréhensibles :
-/// - `PermissionDenied` → conseil groupe `dialout`
-/// - `NotFound`         → alias `by-id` obsolète ou câble débranché
-/// - `NoDevice`         → port verrouillé par un processus concurrent (EBUSY/TIOCEXCL)
-/// - `InvalidInput`     → paramètre de configuration invalide
-/// - _                  → erreur matérielle ou périphérique non initialisé
+/// Ajoute un conseil pour les erreurs de permission, de port absent,
+/// de port occupé ou de paramètre invalide.
 fn enrich_serial_open_error(port: &str, error: &tokio_serial::Error) -> String {
     use tokio_serial::ErrorKind;
     let hint: &str = match error.kind() {
         ErrorKind::Io(std::io::ErrorKind::PermissionDenied) => concat!(
-            "\n  → Permission refusée : vérifiez que votre compte est membre du groupe 'dialout'",
-            "\n    sudo usermod -aG dialout $USER  (puis fermer et rouvrir la session)"
+            "\n  Permission refusée. Vérifiez que votre compte est membre du groupe 'dialout'.",
+            "\n  Commande : sudo usermod -aG dialout $USER. Ouvrez ensuite une nouvelle session."
         ),
         ErrorKind::Io(std::io::ErrorKind::NotFound) => concat!(
-            "\n  → Périphérique introuvable : câble débranché ou alias by-id obsolète",
-            "\n    Rebranchez la carte puis rafraîchissez la liste des ports (bouton ↺)"
+            "\n  Périphérique introuvable. Vérifiez le câble et le chemin du port.",
+            "\n  Rebranchez l’appareil et utilisez le bouton de rafraîchissement des ports."
         ),
         // EBUSY (POSIX) : TIOCEXCL déjà positionné par un autre processus
         ErrorKind::NoDevice => {
-            "\n  → Port verrouillé : fermez les outils concurrents (minicom, screen, picocom, OpenOCD, GDB, st-link…)"
+            "\n  Port verrouillé. Fermez les autres programmes qui utilisent ce port, comme minicom ou screen."
         }
         ErrorKind::InvalidInput => {
-            "\n  → Paramètre invalide : vérifiez le baudrate et les options avancées"
+            "\n  Paramètre invalide. Vérifiez le débit et les options série."
         }
-        _ => "\n  → Erreur matérielle ou périphérique non initialisé",
+        _ => "\n  Vérifiez l'état matériel du périphérique et sa connexion.",
     };
     format!("Impossible d'ouvrir le port {port} : {error}{hint}")
 }
@@ -180,7 +176,8 @@ fn infer_friendly_name(
     )
 }
 
-fn is_linux_hotplug_device_name(device: &str) -> bool {
+#[cfg(target_os = "linux")]
+pub fn is_linux_hotplug_device_name(device: &str) -> bool {
     let Some(device_name) = Path::new(device).file_name().and_then(|name| name.to_str()) else {
         return false;
     };
@@ -456,11 +453,11 @@ impl Connection for SerialManager {
                 anyhow::anyhow!("{}", enrich_serial_open_error(&self.config.port, &e))
             })?;
 
-        // Vider le buffer RX pour éviter de lire des données stale d'une session précédente
-        // (reconnexion rapide sans arrachage physique, ou données en attente à l'ouverture).
-        if let Err(e) = port.clear(ClearBuffer::Input) {
-            log::warn!("Impossible de vider le buffer RX série à l'ouverture : {e}");
-        }
+        // Une session ne démarre que si les données de la précédente ont été purgées.
+        port.clear(ClearBuffer::All).map_err(|error| {
+            self.state = ConnectionState::Error;
+            anyhow::anyhow!("Impossible de purger le port série : {error}")
+        })?;
 
         self.port = Some(port);
         self.state = ConnectionState::Connected;
@@ -477,12 +474,10 @@ impl Connection for SerialManager {
 
         log::info!("Déconnexion série de {}...", self.config.port);
 
-        // Flush le buffer TX avant de fermer le port pour vider les données en attente.
-        // On ignore les erreurs ici : si le port est déjà arraché (EIO), le flush
-        // échoue de toute façon et on veut quand même fermer proprement.
-        if let Some(port) = self.port.as_mut() {
-            if let Err(e) = port.flush().await {
-                log::debug!("Flush série ignoré à la déconnexion : {e}");
+        // Ne jamais attendre tcdrain à la fermeture : CTS/XOFF peut rester bloqué.
+        if let Some(port) = self.port.as_ref() {
+            if let Err(error) = port.clear(ClearBuffer::Output) {
+                log::debug!("Purge TX à la déconnexion : {error}");
             }
         }
 
@@ -500,23 +495,33 @@ impl Connection for SerialManager {
     async fn send(&mut self, data: &[u8]) -> Result<usize> {
         let port = self.port.as_mut().context("Port série non connecté")?;
 
-        let written = match port.write(data).await {
-            Ok(written) => written,
-            Err(error) => {
-                self.state = classify_serial_io_error(&error);
-                bail!(serial_io_context("l'écriture", &error));
+        let result = tokio::time::timeout(self.config.timeout, async {
+            port.write_all(data).await?;
+            // flush() appelle tcdrain sur Unix et peut bloquer le thread Tokio.
+            // Attendre le tampon pilote de façon coopérative et bornée.
+            while port.bytes_to_write().map_err(std::io::Error::from)? > 0 {
+                tokio::time::sleep(Duration::from_millis(2)).await;
             }
+            Ok::<(), std::io::Error>(())
+        })
+        .await;
+        let error = match result {
+            Ok(Ok(())) => None,
+            Ok(Err(error)) => Some(error),
+            Err(_) => Some(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                "Délai d'envoi dépassé ; une partie du message peut avoir été transmise",
+            )),
         };
-
-        if let Err(error) = port.flush().await {
+        if let Some(error) = error {
             self.state = classify_serial_io_error(&error);
-            bail!(serial_io_context("le flush", &error));
+            bail!(serial_io_context("l'écriture", &error));
         }
 
         self.bytes_sent = self
             .bytes_sent
-            .saturating_add(u64::try_from(written).unwrap_or(0));
-        Ok(written)
+            .saturating_add(u64::try_from(data.len()).unwrap_or(0));
+        Ok(data.len())
     }
 
     async fn read(&mut self) -> Result<Vec<u8>> {
@@ -578,6 +583,60 @@ impl Connection for SerialManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn send_times_out_when_peer_does_not_drain_and_disconnect_stays_responsive() {
+        let (_peer, port) = SerialStream::pair().expect("PTY pair");
+        let mut manager = SerialManager::new(SerialConfig {
+            timeout: Duration::from_millis(20),
+            ..SerialConfig::default()
+        });
+        manager.port = Some(port);
+        manager.state = ConnectionState::Connected;
+        let result =
+            tokio::time::timeout(Duration::from_secs(2), manager.send(&vec![b'x'; 1_048_576]))
+                .await
+                .expect("send must be bounded");
+        assert!(result.is_err());
+        assert_eq!(manager.bytes_sent(), 0);
+        tokio::time::timeout(Duration::from_secs(1), manager.disconnect())
+            .await
+            .expect("disconnect must not drain indefinitely")
+            .expect("disconnect");
+        assert!(manager.port.is_none());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn connect_purges_old_input_and_keeps_new_input() {
+        let (mut peer, mut slave) = SerialStream::pair().expect("PTY pair");
+        slave.set_exclusive(false).expect("allow manager open");
+        let path = slave.name().expect("slave path");
+        peer.write_all(b"old session")
+            .await
+            .expect("seed old bytes");
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        assert!(slave.bytes_to_read().expect("pending input") > 0);
+        drop(slave); // Libérer également le verrou flock du slave.
+        let mut manager = SerialManager::new(SerialConfig {
+            port: path,
+            ..SerialConfig::default()
+        });
+        manager.connect().await.expect("open and purge");
+        assert!(
+            tokio::time::timeout(Duration::from_millis(30), manager.read())
+                .await
+                .is_err()
+        );
+        peer.write_all(b"fresh").await.expect("new bytes");
+        let data = tokio::time::timeout(Duration::from_secs(1), manager.read())
+            .await
+            .expect("fresh input available")
+            .expect("read");
+        assert_eq!(data, b"fresh");
+        manager.disconnect().await.expect("close");
+    }
 
     // ── SerialConfig::default() ───────────────────────────────────────────────
 
@@ -689,7 +748,10 @@ mod tests {
             msg.contains("introuvable"),
             "devrait mentionner 'introuvable'"
         );
-        assert!(msg.contains("↺"), "devrait suggérer de rafraîchir la liste");
+        assert!(
+            msg.contains("rafraîchissement"),
+            "devrait suggérer de rafraîchir la liste"
+        );
     }
 
     #[test]

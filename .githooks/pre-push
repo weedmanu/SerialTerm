@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Hook Git pre-push : re-valide le gate standard avant chaque push.
+# Évite de pousser un lot qui n'a pas passé la validation locale.
+set -euo pipefail
+
+ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+
+echo "[pre-push] validation gate standard avant push..."
+exec "${ROOT_DIR}/scripts/pre-commit-checks.sh"

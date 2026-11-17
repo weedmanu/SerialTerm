@@ -31,11 +31,11 @@ use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
 
-use chrono::Local;
 use gtk4::prelude::*;
 use gtk4::{
     Box as GtkBox, SearchBar, SearchEntry, TextBuffer, TextMark, TextTag, TextTagTable, TextView,
 };
+use jiff::Zoned;
 use vte::{Parser, Perform};
 
 use crate::ui::i18n::UiLang;
@@ -133,6 +133,7 @@ struct TimestampedLine {
 #[derive(Default)]
 pub(super) struct TimestampedLogRecorder {
     completed_lines: VecDeque<TimestampedLine>,
+    completed_bytes: usize,
     current_line: String,
     current_kind: Option<LogLineKind>,
     current_timestamp: Option<String>,
@@ -146,12 +147,20 @@ impl TimestampedLogRecorder {
 
         for ch in text.chars() {
             if self.current_timestamp.is_none() {
-                self.current_timestamp = Some(Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
+                self.current_timestamp =
+                    Some(Zoned::now().strftime("%Y-%m-%d %H:%M:%S").to_string());
             }
             if self.current_kind.is_none() {
                 self.current_kind = Some(kind);
             }
 
+            // Une ligne sans LF ne doit pas croître sans limite.
+            if self.current_line.len() >= 65_536 {
+                self.finish_current_line();
+                self.current_kind = Some(kind);
+                self.current_timestamp =
+                    Some(Zoned::now().strftime("%Y-%m-%d %H:%M:%S").to_string());
+            }
             self.current_line.push(ch);
 
             if ch == '\n' {
@@ -169,25 +178,32 @@ impl TimestampedLogRecorder {
         let timestamp = self
             .current_timestamp
             .take()
-            .unwrap_or_else(|| Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
+            .unwrap_or_else(|| Zoned::now().strftime("%Y-%m-%d %H:%M:%S").to_string());
         let kind = self.current_kind.take().unwrap_or(LogLineKind::Rx);
         let text = std::mem::take(&mut self.current_line);
 
+        self.completed_bytes = self.completed_bytes.saturating_add(text.len());
         self.completed_lines.push_back(TimestampedLine {
             kind,
             timestamp,
             text,
         });
+        self.trim_to_max_lines(usize::MAX);
     }
 
     pub(super) fn trim_to_max_lines(&mut self, max_lines: usize) {
-        while self.completed_lines.len() > max_lines {
-            self.completed_lines.pop_front();
+        while self.completed_lines.len() > max_lines || self.completed_bytes > 4_194_304 {
+            if let Some(line) = self.completed_lines.pop_front() {
+                self.completed_bytes = self.completed_bytes.saturating_sub(line.text.len());
+            } else {
+                break;
+            }
         }
     }
 
     pub(super) fn clear(&mut self) {
         self.completed_lines.clear();
+        self.completed_bytes = 0;
         self.current_line.clear();
         self.current_kind = None;
         self.current_timestamp = None;
@@ -502,7 +518,7 @@ impl AnsiPerformer {
         self.flags & flag != 0
     }
 
-    fn set_flag(&mut self, flag: u8, enabled: bool) {
+    const fn set_flag(&mut self, flag: u8, enabled: bool) {
         if enabled {
             self.flags |= flag;
         } else {
@@ -537,7 +553,12 @@ impl AnsiPerformer {
     /// contamine la suivante.
     pub(super) fn reset_session(&mut self) {
         self.pending_text.clear();
+        self.flags = 0;
         self.reset_attrs();
+        let table = self.buffer.tag_table();
+        for (_, tag) in self.fg_ext_tags.drain().chain(self.bg_ext_tags.drain()) {
+            table.remove(&tag);
+        }
         // Replacer le curseur en fin de buffer pour la nouvelle session.
         let end = self.buffer.end_iter();
         self.buffer.move_mark(&self.cursor_mark, &end);
@@ -546,7 +567,7 @@ impl AnsiPerformer {
     /// Réinitialise tous les attributs de style au défaut terminal (SGR 0).
     ///
     /// Appelé lors d'un code SGR `0` (reset complet) ou d'une séquence `\e[m`.
-    fn reset_attrs(&mut self) {
+    const fn reset_attrs(&mut self) {
         self.current_fg = None; // supprime la couleur avant-plan ANSI
         self.current_bg = None; // supprime la couleur arrière-plan ANSI
         self.current_fg_rgb = None; // supprime la couleur étendue avant-plan
@@ -562,6 +583,10 @@ impl AnsiPerformer {
         let key = (u32::from(r) << 16) | (u32::from(g) << 8) | u32::from(b); // paquetage RGB → clé u32
 
         if !self.fg_ext_tags.contains_key(&key) {
+            // Au-delà du plafond, utiliser la couleur par défaut plutôt qu'accumuler des tags.
+            if self.fg_ext_tags.len() >= 1024 {
+                return None;
+            }
             // Premier accès à cette couleur : création du tag GTK avant-plan
             let color = format!("#{r:02X}{g:02X}{b:02X}"); // représentation CSS hexadécimale
             let tag = gtk4::TextTag::builder()
@@ -583,6 +608,10 @@ impl AnsiPerformer {
         let key = (u32::from(r) << 16) | (u32::from(g) << 8) | u32::from(b); // paquetage RGB → clé u32
 
         if !self.bg_ext_tags.contains_key(&key) {
+            // Au-delà du plafond, utiliser la couleur par défaut plutôt qu'accumuler des tags.
+            if self.bg_ext_tags.len() >= 1024 {
+                return None;
+            }
             // Premier accès à cette couleur : création du tag GTK arrière-plan
             let color = format!("#{r:02X}{g:02X}{b:02X}"); // représentation CSS hexadécimale
             let tag = gtk4::TextTag::builder()
@@ -1106,6 +1135,29 @@ mod tests {
     use super::*;
 
     #[test]
+    fn recorder_bounds_unterminated_utf8_lines_and_total_bytes() {
+        let mut recorder = TimestampedLogRecorder::default();
+        let chunk = "é".repeat(4096);
+        for _ in 0..600 {
+            recorder.append_fragment(LogLineKind::Rx, &chunk);
+        }
+        assert!(recorder.current_line.len() <= 65_540);
+        assert!(recorder.completed_bytes <= 4_194_304);
+        assert_eq!(
+            recorder.completed_bytes,
+            recorder
+                .completed_lines
+                .iter()
+                .map(|line| line.text.len())
+                .sum::<usize>()
+        );
+        recorder.trim_to_max_lines(2);
+        assert!(recorder.completed_lines.len() <= 2);
+        recorder.clear();
+        assert_eq!(recorder.completed_bytes, 0);
+    }
+
+    #[test]
     fn export_timestamped_text_preserves_device_payload_prefix() {
         let mut recorder = TimestampedLogRecorder::default();
 
@@ -1170,7 +1222,7 @@ mod tests {
         recorder.completed_lines.push_back(TimestampedLine {
             kind: LogLineKind::Tx,
             timestamp: "2026-03-25 05:42:05".to_string(),
-            text: "→ AT\n".to_string(),
+            text: "TX : AT\n".to_string(),
         });
         recorder.completed_lines.push_back(TimestampedLine {
             kind: LogLineKind::System,
@@ -1184,7 +1236,7 @@ mod tests {
         assert!(exported.contains("=== TX ==="));
         assert!(exported.contains("=== SYSTEM ==="));
         assert!(exported.contains("[2026-03-25 05:42:04] OK"));
-        assert!(exported.contains("[2026-03-25 05:42:05] → AT"));
+        assert!(exported.contains("[2026-03-25 05:42:05] TX : AT"));
         assert!(exported.contains("[2026-03-25 05:42:06] Terminal efface."));
     }
 

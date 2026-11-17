@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Hook Git commit-msg : vérifie la structure du message de commit.
+# Règles :
+#   - Ligne 1 non vide.
+#   - Ligne 1 ≤ 72 caractères.
+set -euo pipefail
+
+MSG_FILE="$1"
+FIRST_LINE="$(head -1 "${MSG_FILE}")"
+
+if [ -z "${FIRST_LINE}" ]; then
+    echo "[commit-msg] ERREUR : message de commit vide — commit refusé." >&2
+    exit 1
+fi
+
+if [ "${#FIRST_LINE}" -gt 72 ]; then
+    echo "[commit-msg] ERREUR : ligne 1 trop longue (${#FIRST_LINE} > 72 caractères) — commit refusé." >&2
+    echo "[commit-msg] Résumé actuel : ${FIRST_LINE}" >&2
+    exit 1
+fi

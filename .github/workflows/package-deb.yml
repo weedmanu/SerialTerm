@@ -1,0 +1,88 @@
+name: Package Debian
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    uses: ./.github/workflows/ci.yml
+
+  deb:
+    needs: quality
+    name: Build .deb
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer les dépendances système
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            libdbus-1-dev \
+            libudev-dev \
+            libssl-dev \
+            pkgconf \
+            cmake \
+            clang \
+            libclang-dev \
+            debhelper \
+            devscripts \
+            fakeroot \
+            lintian \
+            groff
+
+      - name: Configurer Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-deb-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Archiver les sources et construire le .deb
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(dpkg-parsechangelog -S Version)"
+          if [[ "$GITHUB_REF_TYPE" == "tag" && "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "Le tag $GITHUB_REF_NAME ne correspond pas à la version $version." >&2
+            exit 1
+          fi
+          workspace="$PWD"
+          source_dir="$(mktemp -d)"
+          name="serial-term-$version"
+          git archive --format=tar.gz --prefix="$name/" -o "$source_dir/$name.tar.gz" HEAD
+          tar -xzf "$source_dir/$name.tar.gz" -C "$source_dir"
+          cd "$source_dir/$name"
+          bash scripts/build-deb.sh
+          mkdir -p "$workspace/dist/debian"
+          cp dist/debian/*.deb "$source_dir/$name.tar.gz" "$workspace/dist/debian/"
+          cd "$workspace/dist/debian"
+          git -C "$workspace" rev-parse HEAD > COMMIT
+          sha256sum ./*.deb ./*.tar.gz COMMIT > SHA256SUMS
+
+      - name: Publier le paquet, les sources et les sommes de contrôle
+        uses: actions/upload-artifact@v4
+        with:
+          name: serial-term-deb
+          path: |
+            dist/debian/
+          retention-days: 90

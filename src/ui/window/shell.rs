@@ -15,6 +15,25 @@ use crate::ui::input_panel::InputPanel;
 use crate::ui::terminal_panel::TerminalPanel;
 use crate::ui::theme::{Theme, ThemeManager};
 
+#[cfg(test)]
+thread_local! {
+    static TEST_APPLICATION: libadwaita::Application = {
+        use gtk4::gio::prelude::ApplicationExt;
+
+        let app = libadwaita::Application::builder()
+            .application_id("io.github.tutoelectroweb.serialterm.tests")
+            .build();
+        app.register(gtk4::gio::Cancellable::NONE)
+            .expect("l'application GTK de test doit pouvoir s'enregistrer");
+        app
+    };
+}
+
+#[cfg(test)]
+pub(super) fn test_application() -> libadwaita::Application {
+    TEST_APPLICATION.with(Clone::clone)
+}
+
 fn defer_terminal_welcome_until_mapped(
     window: &libadwaita::ApplicationWindow,
     notice_label: &Label,
@@ -55,11 +74,14 @@ pub(super) fn set_bottom_notice(
         return;
     };
 
-    let notice_label = notice_label.clone();
+    let notice_label = notice_label.downgrade();
     let notice_generation = notice_generation.clone();
     gtk4::glib::timeout_add_local(
         std::time::Duration::from_secs(u64::from(delay_secs)),
         move || {
+            let Some(notice_label) = notice_label.upgrade() else {
+                return gtk4::glib::ControlFlow::Break;
+            };
             if notice_generation.get() == next_generation {
                 notice_label.set_label("");
             }
@@ -106,6 +128,12 @@ pub struct MainWindow {
 }
 
 impl MainWindow {
+    #[cfg(test)]
+    fn restore_sidebar_visibility(&self, show_sidebar: bool) {
+        self.header.toggle_sidebar_button.set_active(show_sidebar);
+    }
+
+    #[cfg(not(test))]
     fn restore_sidebar_visibility(&self, show_sidebar: bool) {
         if !show_sidebar {
             self.header.toggle_sidebar_button.set_active(false);
@@ -158,7 +186,6 @@ impl MainWindow {
             .serial_panel
             .set_auto_select_single_port(serial.auto_select_single_port);
 
-        self.connection_panel.serial_panel.refresh_ports();
         self.connection_panel
             .serial_panel
             .select_port_by_device(&serial.port);
@@ -189,7 +216,7 @@ impl MainWindow {
     }
 
     pub(super) fn sync_ui_state_to_settings(&self) {
-        let serial_snapshot = self.connection_panel.serial_panel.snapshot_settings();
+        let mut serial_snapshot = self.connection_panel.serial_panel.snapshot_settings();
         let line_ending = match self.input.line_ending_dropdown.selected() {
             1 => "CR",
             2 => "CRLF",
@@ -199,6 +226,9 @@ impl MainWindow {
 
         let mut settings = self.settings.borrow_mut();
         let app_settings = settings.settings_mut();
+        if serial_snapshot.port.is_empty() {
+            serial_snapshot.port.clone_from(&app_settings.serial.port);
+        }
         app_settings.serial = serial_snapshot;
         app_settings.ui.show_sidebar = self.header.toggle_sidebar_button.is_active();
         app_settings.ui.stop_scroll = self.input.stop_scroll_enabled();
@@ -215,6 +245,16 @@ impl MainWindow {
     /// sous-fonctions briserait les borrows des widgets partagés entre sections.
     #[allow(clippy::too_many_lines)]
     pub fn new(app: &libadwaita::Application) -> Option<Rc<Self>> {
+        Self::build(app, true)
+    }
+
+    #[cfg(test)]
+    pub(super) fn new_for_test(app: &libadwaita::Application) -> Option<Rc<Self>> {
+        Self::build(app, false)
+    }
+
+    #[allow(clippy::too_many_lines)]
+    fn build(app: &libadwaita::Application, present: bool) -> Option<Rc<Self>> {
         let settings = Rc::new(RefCell::new(SettingsManager::new()));
         let s = settings.borrow();
         let lang = UiLang::from_preference(&s.settings().ui.language);
@@ -506,11 +546,28 @@ impl MainWindow {
         Self::setup_actions(&main_win);
         main_win.restore_ui_from_settings();
         Self::setup_signals(&main_win);
+        if let Some(warning) = main_win.settings.borrow().load_warning() {
+            let dialog = libadwaita::AlertDialog::new(Some("Configuration"), Some(warning));
+            dialog.add_response("ok", "OK");
+            dialog.present(Some(&main_win.window));
+        }
 
         // Connexion automatique au démarrage si l'option est activée.
-        main_win.maybe_start_auto_connect();
+        if present {
+            let window = Rc::downgrade(&main_win);
+            gtk4::glib::spawn_future_local(async move {
+                if let Some(window) = window.upgrade() {
+                    window.refresh_serial_ports().await;
+                    if window.window.is_visible() {
+                        window.maybe_start_auto_connect();
+                    }
+                }
+            });
+        }
 
-        main_win.window.present();
+        if present {
+            main_win.window.present();
+        }
         Some(main_win)
     }
 }

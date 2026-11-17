@@ -4,7 +4,9 @@
 // =============================================================================
 
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -14,6 +16,8 @@ thread_local! {
     static TEST_CONFIG_PATH_OVERRIDE: std::cell::RefCell<Option<PathBuf>> =
         const { std::cell::RefCell::new(None) };
 }
+
+static NEXT_SAVE: AtomicU64 = AtomicU64::new(0);
 
 pub const MIN_WINDOW_WIDTH: i32 = 800;
 pub const MIN_WINDOW_HEIGHT: i32 = 600;
@@ -170,16 +174,29 @@ impl Default for LogSettings {
 pub struct SettingsManager {
     settings: AppSettings,
     config_path: PathBuf,
+    load_warning: Option<String>,
 }
 
 impl SettingsManager {
     /// Crée un nouveau gestionnaire en chargeant depuis le chemin par défaut.
     pub fn new() -> Self {
         let config_path = Self::default_config_path();
-        let settings = Self::load_from_path(&config_path).unwrap_or_default();
+        let (settings, load_warning) = match Self::load_from_path(&config_path) {
+            Ok(settings) => (settings, None),
+            Err(error) if !config_path.exists() => {
+                log::debug!("Configuration absente : {error}");
+                (AppSettings::default(), None)
+            }
+            Err(error) => {
+                let warning = format!("Configuration illisible : {error:#}. Valeurs par défaut utilisées ; sauvegarde .bak avant remplacement.");
+                log::warn!("{warning}");
+                (AppSettings::default(), Some(warning))
+            }
+        };
         Self {
             settings,
             config_path,
+            load_warning,
         }
     }
 
@@ -228,13 +245,48 @@ impl SettingsManager {
         }
         let json =
             serde_json::to_string_pretty(&self.settings).context("Erreur de sérialisation JSON")?;
-        fs::write(&self.config_path, json)
-            .with_context(|| format!("Impossible d'écrire {}", self.config_path.display()))?;
+        // Préserver le JSON invalide avant toute tentative de remplacement.
+        if let Ok(previous) = fs::read(&self.config_path) {
+            if serde_json::from_slice::<AppSettings>(&previous).is_err() {
+                fs::write(self.config_path.with_extension("json.bak"), previous)
+                    .context("Impossible de sauvegarder la configuration invalide")?;
+            }
+        }
+        let temp_path = self.config_path.with_extension(format!(
+            "json.{}.{}.tmp",
+            std::process::id(),
+            NEXT_SAVE.fetch_add(1, Ordering::Relaxed)
+        ));
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp_path)
+            .context("Impossible de créer le fichier temporaire de configuration")?;
+        let result = (|| -> Result<()> {
+            file.write_all(json.as_bytes())?;
+            file.sync_all()?;
+            drop(file);
+            fs::rename(&temp_path, &self.config_path)?;
+            #[cfg(unix)]
+            if let Some(parent) = self.config_path.parent() {
+                fs::File::open(parent)?.sync_all()?;
+            }
+            Ok(())
+        })();
+        if result.is_err() {
+            let _ = fs::remove_file(&temp_path);
+        }
+        result.with_context(|| format!("Impossible d'écrire {}", self.config_path.display()))?;
         log::info!(
             "Configuration sauvegardée dans {}",
             self.config_path.display()
         );
         Ok(())
+    }
+
+    /// Avertissement à présenter après la construction de l'interface.
+    pub fn load_warning(&self) -> Option<&str> {
+        self.load_warning.as_deref()
     }
 
     /// Accès en lecture aux paramètres.
@@ -243,7 +295,7 @@ impl SettingsManager {
     }
 
     /// Accès en écriture aux paramètres.
-    pub fn settings_mut(&mut self) -> &mut AppSettings {
+    pub const fn settings_mut(&mut self) -> &mut AppSettings {
         &mut self.settings
     }
 
@@ -264,7 +316,7 @@ impl SettingsManager {
     }
 
     /// Met à jour la taille de fenêtre.
-    pub fn set_window_size(&mut self, width: i32, height: i32) {
+    pub const fn set_window_size(&mut self, width: i32, height: i32) {
         self.settings.ui.window_width = clamp_window_width(width);
         self.settings.ui.window_height = clamp_window_height(height);
     }
@@ -285,6 +337,43 @@ impl SettingsManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn save_preserves_invalid_json_and_replaces_valid_config_atomically() {
+        let root =
+            std::env::temp_dir().join(format!("serial-term-settings-{}", std::process::id()));
+        fs::create_dir_all(&root).expect("test directory");
+        let path = root.join("settings.json");
+        fs::write(&path, b"{invalid").expect("invalid fixture");
+        SettingsManager::set_test_config_path(path.clone());
+        let mut manager = SettingsManager::new();
+        SettingsManager::clear_test_config_path();
+        assert!(manager.load_warning().is_some());
+        manager.settings_mut().serial.baudrate = 9600;
+        manager.save().expect("atomic save");
+        assert_eq!(
+            fs::read(path.with_extension("json.bak")).expect("backup"),
+            b"{invalid"
+        );
+        assert_eq!(
+            SettingsManager::load_from_path(&path)
+                .expect("valid config")
+                .serial
+                .baudrate,
+            9600
+        );
+        manager.settings_mut().serial.baudrate = 115_200;
+        manager.save().expect("replace existing file");
+        assert_eq!(
+            SettingsManager::load_from_path(&path)
+                .expect("valid replacement")
+                .serial
+                .baudrate,
+            115_200
+        );
+        assert_eq!(fs::read_dir(&root).expect("directory").count(), 2);
+        fs::remove_dir_all(root).expect("cleanup");
+    }
 
     // ── AppSettings defaults ──────────────────────────────────────────────────
 
@@ -390,6 +479,7 @@ mod tests {
         let mut mgr = SettingsManager {
             settings: AppSettings::default(),
             config_path: std::path::PathBuf::new(),
+            load_warning: None,
         };
         mgr.set_window_size(1920, 1080);
         assert_eq!(mgr.settings().ui.window_width, 1920);
@@ -401,6 +491,7 @@ mod tests {
         let mut mgr = SettingsManager {
             settings: AppSettings::default(),
             config_path: std::path::PathBuf::new(),
+            load_warning: None,
         };
         mgr.set_window_size(320, 240);
         assert_eq!(mgr.settings().ui.window_width, MIN_WINDOW_WIDTH);

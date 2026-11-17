@@ -4,8 +4,6 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use gtk4::gio::prelude::*;
-
 use super::*;
 use crate::core::settings::{AppSettings, SettingsManager};
 
@@ -15,10 +13,12 @@ fn drain_main_loop() {
     while gtk4::glib::MainContext::default().iteration(false) {}
 }
 
-fn close_window_for_tests(window: &Rc<MainWindow>) {
-    if window.window.is_visible() {
-        window.window.close();
+fn close_window_for_tests(window: Rc<MainWindow>) {
+    if window.window.is_visible() || window.window.is_mapped() {
+        window.window.destroy();
     }
+    drain_main_loop();
+    drop(window);
     drain_main_loop();
 }
 
@@ -27,15 +27,7 @@ fn isolated_test_config_path(id: usize) -> PathBuf {
 }
 
 fn build_test_app() -> libadwaita::Application {
-    let id = TEST_APP_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let app = libadwaita::Application::builder()
-        .application_id(format!(
-            "io.github.tutoelectroweb.serialterm.shelltests{id}"
-        ))
-        .build();
-    app.register(gtk4::gio::Cancellable::NONE)
-        .expect("l'application GTK de test doit pouvoir s'enregistrer");
-    app
+    test_application()
 }
 
 fn build_window_for_tests() -> Rc<MainWindow> {
@@ -55,7 +47,8 @@ fn build_window_for_tests() -> Rc<MainWindow> {
 
     SettingsManager::set_test_config_path(path);
     let app = build_test_app();
-    let window = MainWindow::new(&app).expect("la fenêtre principale doit être construite");
+    let window =
+        MainWindow::new_for_test(&app).expect("la fenêtre principale doit être construite");
     SettingsManager::clear_test_config_path();
     window
 }
@@ -100,7 +93,7 @@ fn deferred_welcome_waits_for_window_mapping_and_runs_once() {
     }
 
     assert_eq!(notice_label.label(), first_pass);
-    window.close();
+    window.destroy();
     drain_main_loop();
 }
 
@@ -181,7 +174,7 @@ fn restore_ui_from_settings_matches_visible_widgets() {
         .expect("l'état langue doit être une chaîne");
     assert_eq!(lang_state, "en");
 
-    close_window_for_tests(&window);
+    close_window_for_tests(window);
 }
 
 #[gtk4::test]
@@ -220,5 +213,5 @@ fn sync_ui_state_to_settings_captures_current_widgets() {
     assert!(settings.settings().ui.show_sidebar);
 
     drop(settings);
-    close_window_for_tests(&window);
+    close_window_for_tests(window);
 }
